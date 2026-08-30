@@ -60,14 +60,12 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
         )}
 
         <div className="flex gap-2 mt-2">
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 text-center text-sm rounded-lg py-2 btn-premium"
+          <button
+            onClick={() => setShowCompare(true)}
+            className="flex-1 text-center text-sm rounded-lg py-2 btn-premium cursor-pointer"
           >
             Buy →
-          </a>
+          </button>
 
           {isBought ? (
             <button
@@ -100,13 +98,6 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
             </button>
           )}
         </div>
-
-        <button
-          onClick={() => setShowCompare(true)}
-          className="text-xs text-[var(--color-lantern)] hover:underline text-left mt-1 cursor-pointer"
-        >
-          Compare prices across platforms →
-        </button>
       </div>
 
       {showCompare && (
@@ -114,6 +105,9 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
           roomId={roomId}
           itemId={item.id}
           itemTitle={item.title || item.url}
+          savedUrl={item.url}
+          savedSource={item.source}
+          savedPrice={item.price}
           onClose={() => setShowCompare(false)}
         />
       )}
@@ -121,7 +115,7 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
   );
 }
 
-function ComparePricesModal({ roomId, itemId, itemTitle, onClose }) {
+function ComparePricesModal({ roomId, itemId, itemTitle, savedUrl, savedSource, savedPrice, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [offers, setOffers] = useState([]);
@@ -141,7 +135,7 @@ function ComparePricesModal({ roomId, itemId, itemTitle, onClose }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [roomId, itemId]);
 
   return (
     <div
@@ -149,12 +143,12 @@ function ComparePricesModal({ roomId, itemId, itemTitle, onClose }) {
       onClick={onClose}
     >
       <div
-        className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 max-w-md w-full card-elevated max-h-[80vh] overflow-y-auto"
+        className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 max-w-md w-full card-elevated max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-start justify-between gap-3 mb-1">
           <h3 className="font-[var(--font-display)] text-lg text-[var(--color-cream)] leading-snug">
-            Compare prices
+            Where to buy
           </h3>
           <button
             onClick={onClose}
@@ -164,6 +158,25 @@ function ComparePricesModal({ roomId, itemId, itemTitle, onClose }) {
           </button>
         </div>
         <p className="text-xs text-[var(--color-mist)] mb-4 line-clamp-1">{itemTitle}</p>
+
+        {/* The link the user actually pasted — always shown first, always works */}
+        <a
+          href={savedUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between gap-3 bg-[var(--color-surface-2)] border border-[var(--color-lantern)] rounded-lg px-3 py-2.5 mb-3"
+        >
+          <span className="text-sm text-[var(--color-cream)] truncate">
+            {savedSource || "Saved link"} <span className="text-[10px] text-[var(--color-lantern)]">(your link)</span>
+          </span>
+          <span className="font-[var(--font-mono)] text-[var(--color-lantern)] font-semibold text-sm shrink-0">
+            {savedPrice != null ? `₹${Number(savedPrice).toLocaleString("en-IN")}` : "—"}
+          </span>
+        </a>
+
+        <p className="text-[10px] uppercase tracking-wide text-[var(--color-mist)] mb-2">
+          Other platforms
+        </p>
 
         {loading && (
           <p className="text-sm text-[var(--color-mist)]">Searching platforms…</p>
@@ -175,7 +188,7 @@ function ComparePricesModal({ roomId, itemId, itemTitle, onClose }) {
 
         {!loading && !error && offers.length === 0 && (
           <p className="text-sm text-[var(--color-mist)]">
-            No comparable listings found for this product yet.
+            No other listings found for this product — the link above is your best bet.
           </p>
         )}
 
