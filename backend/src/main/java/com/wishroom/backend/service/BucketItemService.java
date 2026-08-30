@@ -34,8 +34,36 @@ public class BucketItemService {
     public ComparePricesResponse comparePrices(String userId, String roomId, String itemId) {
         roomService.requireMembership(userId, roomId);
         BucketItem item = getItemInRoom(roomId, itemId);
-        String query = item.getTitle() != null && !item.getTitle().isBlank() ? item.getTitle() : item.getUrl();
+        String query = buildSearchQuery(item);
         return priceComparisonService.comparePrices(query);
+    }
+
+    /**
+     * Product titles scraped from retailer pages are often full marketing copy
+     * ("boAt Rockerz Plus 440 | Best-in-Segment Wireless Headphones with Dual
+     * Drivers & 60 Hours Playback"), which makes a poor search query — shopping
+     * search APIs match much better on just the product name. This trims at the
+     * first common separator (|, –, -, :) and caps the length, falling back to
+     * the full title if that leaves nothing usable.
+     */
+    private String buildSearchQuery(BucketItem item) {
+        String title = item.getTitle();
+        if (title == null || title.isBlank()) {
+            return item.getUrl();
+        }
+
+        String cleaned = title.split("[|\u2013\u2014:]")[0].trim();
+        // A lone hyphen is common inside model numbers (e.g. "MX-500"), so only
+        // split on " - " (surrounded by spaces) to avoid mangling those.
+        cleaned = cleaned.split(" - ")[0].trim();
+
+        if (cleaned.length() < 4) {
+            cleaned = title.trim();
+        }
+        if (cleaned.length() > 80) {
+            cleaned = cleaned.substring(0, 80).trim();
+        }
+        return cleaned;
     }
 
     public ItemResponse addItem(String userId, String roomId, AddItemRequest request) {
