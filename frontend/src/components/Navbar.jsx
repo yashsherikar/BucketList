@@ -11,7 +11,7 @@ export default function Navbar() {
         <Link to="/rooms" className="flex items-center gap-2 group">
           <span className="text-2xl" aria-hidden>🏮</span>
           <span
-            className="font-[var(--font-display)] text-xl tracking-tight text-[var(--color-cream)] group-hover:text-[var(--color-lantern)] transition-colors"
+            className="font-[var(--font-display)] gradient-text text-xl tracking-tight transition-colors"
           >
             WishRoom
           </span>

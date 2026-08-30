@@ -114,7 +114,7 @@ export default function AddItemModal({ roomId, onClose, onAdded }) {
         <button
           type="submit"
           disabled={saving}
-          className="w-full bg-[var(--color-lantern)] text-[var(--color-ink)] font-semibold rounded-lg py-2.5 hover:brightness-110 transition disabled:opacity-60 cursor-pointer"
+          className="w-full rounded-lg py-2.5 disabled:opacity-60 cursor-pointer btn-premium"
         >
           {saving ? "Adding…" : "Add to room"}
         </button>

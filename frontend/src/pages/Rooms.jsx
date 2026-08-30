@@ -50,7 +50,7 @@ export default function Rooms() {
             </button>
             <button
               onClick={() => setShowCreate(true)}
-              className="px-4 py-2 rounded-lg bg-[var(--color-lantern)] text-[var(--color-ink)] font-semibold hover:brightness-110 transition cursor-pointer text-sm"
+              className="px-4 py-2 rounded-lg text-sm cursor-pointer btn-premium"
             >
               + New room
             </button>
@@ -117,7 +117,7 @@ function EmptyState({ onCreate, onJoin }) {
         </button>
         <button
           onClick={onCreate}
-          className="px-4 py-2 rounded-lg bg-[var(--color-lantern)] text-[var(--color-ink)] font-semibold hover:brightness-110 transition cursor-pointer text-sm"
+          className="px-4 py-2 rounded-lg text-sm cursor-pointer btn-premium"
         >
           + New room
         </button>
@@ -130,7 +130,7 @@ function RoomCard({ room }) {
   return (
     <Link
       to={`/rooms/${room.id}`}
-      className="block bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 hover:border-[var(--color-lantern)] transition-colors group"
+      className="block bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 hover:border-[var(--color-lantern)] transition-colors group card-elevated"
     >
       <h3 className="font-[var(--font-display)] text-lg text-[var(--color-cream)] group-hover:text-[var(--color-lantern)] transition-colors">
         {room.name}
@@ -194,7 +194,7 @@ function CreateRoomModal({ onClose, onCreated }) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-[var(--color-lantern)] text-[var(--color-ink)] font-semibold rounded-lg py-2.5 hover:brightness-110 transition disabled:opacity-60 cursor-pointer"
+          className="w-full rounded-lg py-2.5 disabled:opacity-60 cursor-pointer btn-premium"
         >
           {loading ? "Creating…" : "Create room"}
         </button>
@@ -240,7 +240,7 @@ function JoinRoomModal({ onClose, onJoined }) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-[var(--color-lantern)] text-[var(--color-ink)] font-semibold rounded-lg py-2.5 hover:brightness-110 transition disabled:opacity-60 cursor-pointer"
+          className="w-full rounded-lg py-2.5 disabled:opacity-60 cursor-pointer btn-premium"
         >
           {loading ? "Joining…" : "Join room"}
         </button>

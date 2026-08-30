@@ -1,19 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  /* ---- WishRoom design tokens: "lantern on a monsoon night" ---- */
-  --color-ink: #101820;         /* base background */
-  --color-surface: #172530;     /* card surface */
-  --color-surface-2: #1F323F;   /* raised surface / hover */
-  --color-border: #2A3D49;
+  /* ---- WishRoom design tokens: "amethyst after dark" — premium purple theme ---- */
+  --color-ink: #17121F;         /* base background — soft charcoal-violet, not too saturated */
+  --color-surface: #201A2E;     /* card surface — muted dark violet */
+  --color-surface-2: #2A2240;   /* raised surface / hover — gentle lift */
+  --color-border: #3D3357;      /* soft violet border, visible but not loud */
 
-  --color-lantern: #F2A93B;     /* primary accent — gold lantern glow */
-  --color-marigold: #E8763C;    /* secondary accent / CTA */
-  --color-sage: #6FAE8A;        /* success / bought state */
-  --color-rose: #D9666B;        /* destructive / remove */
+  --color-lantern: #C9B6F5;     /* primary accent — light lilac (rings, links, highlights) */
+  --color-marigold: #9B7FE0;    /* secondary accent / CTA — mid-tone soft violet */
+  --color-sage: #5FDBA6;        /* success / bought state — soft emerald */
+  --color-rose: #F08BA6;        /* destructive / remove — soft rose */
 
-  --color-cream: #F5F1E8;       /* primary text on dark */
-  --color-mist: #9FB0B8;        /* muted text */
+  --color-cream: #F2EEF9;       /* primary text on dark — near-white with faint violet tint */
+  --color-mist: #A79BC0;        /* muted text — soft lavender-grey */
 
   --font-display: "Fraunces", ui-serif, Georgia, serif;
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -28,6 +28,38 @@ body {
   background-color: var(--color-ink);
   color: var(--color-cream);
   font-family: var(--font-body);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Premium typography ---- */
+/* Display headings (page titles, room names) get the serif treatment with
+   tightened tracking and a touch of weight so they read "designed" rather
+   than default browser bold. Apply font-[var(--font-display)] as before —
+   these rules refine whatever uses that font, site-wide. */
+h1, h2, h3,
+.font-\[var\(--font-display\)\] {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+/* Muted/meta text (timestamps, "added by", helper copy) gets slightly
+   wider letter-spacing at small sizes — a common premium-UI trick that
+   keeps tiny text legible and elegant instead of cramped. */
+.text-sm.text-\[var\(--color-mist\)\],
+.text-xs.text-\[var\(--color-mist\)\] {
+  letter-spacing: 0.01em;
+}
+
+/* Gradient text for the brand wordmark / hero headings.
+   Usage: <span className="gradient-text font-[var(--font-display)]">WishRoom</span> */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-cream) 0%, var(--color-lantern) 55%, var(--color-marigold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* subtle grain so the deep background doesn't look like flat plastic */
@@ -64,6 +96,50 @@ body {
 .ticket-stub::before { left: -7px; }
 .ticket-stub::after { right: -7px; }
 
+/* ---- Premium elevation & glow utilities ---- */
+
+/* Soft violet glow — add to CTA buttons or hero cards for a jewel-lit feel */
+.glow-violet {
+  box-shadow: 0 0 28px -6px rgba(155, 127, 224, 0.45);
+}
+
+/* Elevated card: subtle layered shadow instead of a flat border-only look.
+   Combine with existing bg-[var(--color-surface)] card classes. */
+.card-elevated {
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
+    0 8px 24px -12px rgba(0, 0, 0, 0.55),
+    0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.card-elevated:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
+    0 16px 32px -14px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(201, 182, 245, 0.15);
+}
+
+/* Premium gradient CTA button. Usage:
+   <button className="btn-premium">Buy →</button>
+   Works alongside existing sizing/rounding classes (py-2.5, rounded-lg, etc). */
+.btn-premium {
+  background: linear-gradient(135deg, var(--color-marigold) 0%, #7C5CC7 100%);
+  color: var(--color-cream);
+  font-weight: 600;
+  box-shadow: 0 4px 16px -4px rgba(155, 127, 224, 0.5);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+.btn-premium:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 22px -4px rgba(155, 127, 224, 0.65);
+  transform: translateY(-1px);
+}
+.btn-premium:active {
+  transform: translateY(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  .card-elevated:hover, .btn-premium:hover { transform: none; }
 }

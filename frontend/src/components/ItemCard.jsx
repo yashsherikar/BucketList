@@ -16,7 +16,7 @@ export default function ItemCard({ item, currentUserId, onBuy, onUnbuy, onDelete
 
   return (
     <div
-      className={`bg-[var(--color-surface)] border rounded-2xl overflow-hidden flex flex-col transition-colors ${
+      className={`bg-[var(--color-surface)] border rounded-2xl overflow-hidden flex flex-col transition-colors card-elevated ${
         isBought ? "border-[var(--color-sage)]/40" : "border-[var(--color-border)]"
       }`}
     >
@@ -61,7 +61,7 @@ export default function ItemCard({ item, currentUserId, onBuy, onUnbuy, onDelete
             href={item.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 text-center text-sm font-semibold bg-[var(--color-marigold)] text-[var(--color-ink)] rounded-lg py-2 hover:brightness-110 transition"
+            className="flex-1 text-center text-sm rounded-lg py-2 btn-premium"
           >
             Buy →
           </a>
