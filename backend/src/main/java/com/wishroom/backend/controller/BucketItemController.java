@@ -26,6 +26,13 @@ public class BucketItemController {
         return ResponseEntity.ok(bucketItemService.previewLink(userId(auth), roomId, body.get("url")));
     }
 
+    @GetMapping("/{itemId}/compare-prices")
+    public ResponseEntity<ComparePricesResponse> comparePrices(
+            Authentication auth, @PathVariable String roomId, @PathVariable String itemId
+    ) {
+        return ResponseEntity.ok(bucketItemService.comparePrices(userId(auth), roomId, itemId));
+    }
+
     @PostMapping
     public ResponseEntity<ItemResponse> addItem(
             Authentication auth, @PathVariable String roomId, @Valid @RequestBody AddItemRequest request

@@ -1,23 +1,51 @@
 @import "tailwindcss";
 
 @theme {
-  /* ---- WishRoom design tokens: "amethyst after dark" — premium purple theme ---- */
-  --color-ink: #17121F;         /* base background — soft charcoal-violet, not too saturated */
-  --color-surface: #201A2E;     /* card surface — muted dark violet */
-  --color-surface-2: #2A2240;   /* raised surface / hover — gentle lift */
-  --color-border: #3D3357;      /* soft violet border, visible but not loud */
+  /* ---- WishRoom design tokens: default (dark) values — overridden by [data-theme="light"] below ---- */
+  --color-ink: #140D17;         /* base background */
+  --color-surface: #2A1A2E;     /* card surface — derived: between background and primary */
+  --color-surface-2: #3A2440;   /* raised surface / hover — derived */
+  --color-border: #4A1942;      /* border — primary colour from palette, used as structural accent */
 
-  --color-lantern: #C9B6F5;     /* primary accent — light lilac (rings, links, highlights) */
-  --color-marigold: #9B7FE0;    /* secondary accent / CTA — mid-tone soft violet */
-  --color-sage: #5FDBA6;        /* success / bought state — soft emerald */
-  --color-rose: #F08BA6;        /* destructive / remove — soft rose */
+  --color-lantern: #C77DBA;     /* primary accent — "Special Text Colour" from palette */
+  --color-marigold: #C77DBA;    /* secondary accent / CTA — "Secondary Colour" from palette */
+  --color-sage: #5FDBA6;        /* success / bought state (not in supplied palette, kept jewel-toned) */
+  --color-rose: #F08BA6;        /* destructive / remove (not in supplied palette, kept jewel-toned) */
 
-  --color-cream: #F2EEF9;       /* primary text on dark — near-white with faint violet tint */
-  --color-mist: #A79BC0;        /* muted text — soft lavender-grey */
+  --color-cream: #F8F2F7;       /* primary text on dark — from palette */
+  --color-mist: #E1E1E1;        /* muted text — from palette */
+
+  /* Fixed dark text for use ON TOP of lantern/marigold-colored backgrounds
+     (buttons, active tabs, badges). Not overridden per-theme — those accent
+     backgrounds stay light-to-mid toned in both light and dark mode, so
+     this always needs to stay dark for contrast, unlike page text. */
+  --color-on-accent: #2A1330;
 
   --font-display: "Fraunces", ui-serif, Georgia, serif;
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* ---- Light mode override ----
+   Values below come from the "Light Mode" palette supplied, with one fix:
+   the original export had Primary Text Colour (#F8F2F7) and Secondary Text
+   Colour (#E1E1E1) — both near-white — set against a near-white background
+   (#F5F0F7), which would make text invisible. Those two are replaced here
+   with dark, readable equivalents in the same plum family; every other
+   value matches the supplied palette exactly. */
+[data-theme="light"] {
+  --color-ink: #F5F0F7;         /* background — from palette */
+  --color-surface: #FFFFFF;     /* card surface — derived: pure white for lift off the tinted bg */
+  --color-surface-2: #F0E4EF;   /* raised surface / hover — derived */
+  --color-border: #E3D0E0;      /* border — derived, soft plum-tinted */
+
+  --color-lantern: #C77DBA;     /* primary accent — from palette */
+  --color-marigold: #52244B;    /* secondary accent / CTA — "Secondary Colour" from palette */
+  --color-sage: #1F9E6B;        /* success — darkened for contrast on light bg */
+  --color-rose: #D6416A;        /* destructive — darkened for contrast on light bg */
+
+  --color-cream: #2A1330;       /* primary text — FIXED: dark plum instead of the supplied near-white */
+  --color-mist: #6B5769;        /* muted/secondary text — FIXED: muted mauve-grey instead of near-white */
 }
 
 html, body, #root {
@@ -100,7 +128,7 @@ h1, h2, h3,
 
 /* Soft violet glow — add to CTA buttons or hero cards for a jewel-lit feel */
 .glow-violet {
-  box-shadow: 0 0 28px -6px rgba(155, 127, 224, 0.45);
+  box-shadow: 0 0 28px -6px rgba(199, 125, 186, 0.45);
 }
 
 /* Elevated card: subtle layered shadow instead of a flat border-only look.
@@ -117,22 +145,22 @@ h1, h2, h3,
   box-shadow:
     0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
     0 16px 32px -14px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(201, 182, 245, 0.15);
+    0 0 0 1px rgba(199, 125, 186, 0.15);
 }
 
 /* Premium gradient CTA button. Usage:
    <button className="btn-premium">Buy →</button>
    Works alongside existing sizing/rounding classes (py-2.5, rounded-lg, etc). */
 .btn-premium {
-  background: linear-gradient(135deg, var(--color-marigold) 0%, #7C5CC7 100%);
-  color: var(--color-cream);
+  background: linear-gradient(135deg, var(--color-marigold) 0%, #52244B 100%);
+  color: #FFFFFF; /* always light — sits on a colored gradient in both themes, not page text */
   font-weight: 600;
-  box-shadow: 0 4px 16px -4px rgba(155, 127, 224, 0.5);
+  box-shadow: 0 4px 16px -4px rgba(199, 125, 186, 0.5);
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
 }
 .btn-premium:hover {
   filter: brightness(1.08);
-  box-shadow: 0 6px 22px -4px rgba(155, 127, 224, 0.65);
+  box-shadow: 0 6px 22px -4px rgba(199, 125, 186, 0.65);
   transform: translateY(-1px);
 }
 .btn-premium:active {

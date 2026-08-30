@@ -36,6 +36,8 @@ app:
   jwt:
     secret: "dev-only-change-me-dev-only-change-me-32chars-min"
     expiration-ms: 604800000 # 7 days
+  rapidapi:
+    key: ${RAPIDAPI_KEY:}
 
 ---
 # ------------------- PROD PROFILE (Postgres, used on Render/Railway/etc.) -------------------
@@ -58,3 +60,5 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:604800000}
+  rapidapi:
+    key: ${RAPIDAPI_KEY:}

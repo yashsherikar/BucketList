@@ -1,8 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   return (
@@ -17,22 +19,33 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {user && (
-          <div className="flex items-center gap-4">
-            <span className="hidden sm:block text-sm text-[var(--color-mist)]">
-              {user.name}
-            </span>
-            <button
-              onClick={() => {
-                logout();
-                navigate("/login");
-              }}
-              className="text-sm px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-mist)] hover:text-[var(--color-cream)] hover:border-[var(--color-lantern)] transition-colors cursor-pointer"
-            >
-              Log out
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className="w-9 h-9 flex items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-mist)] hover:text-[var(--color-cream)] hover:border-[var(--color-lantern)] transition-colors cursor-pointer text-base"
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+
+          {user && (
+            <div className="flex items-center gap-4">
+              <span className="hidden sm:block text-sm text-[var(--color-mist)]">
+                {user.name}
+              </span>
+              <button
+                onClick={() => {
+                  logout();
+                  navigate("/login");
+                }}
+                className="text-sm px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-mist)] hover:text-[var(--color-cream)] hover:border-[var(--color-lantern)] transition-colors cursor-pointer"
+              >
+                Log out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

@@ -22,4 +22,6 @@ export const ItemsApi = {
   markWishlisted: (roomId, itemId) =>
     client.post(`/api/rooms/${roomId}/items/${itemId}/unbuy`).then((r) => r.data),
   remove: (roomId, itemId) => client.delete(`/api/rooms/${roomId}/items/${itemId}`),
+  comparePrices: (roomId, itemId) =>
+    client.get(`/api/rooms/${roomId}/items/${itemId}/compare-prices`).then((r) => r.data),
 };

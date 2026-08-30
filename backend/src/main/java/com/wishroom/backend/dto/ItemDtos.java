@@ -3,6 +3,7 @@ package com.wishroom.backend.dto;
 import jakarta.validation.constraints.NotBlank;
 
 import java.time.Instant;
+import java.util.List;
 
 public class ItemDtos {
 
@@ -47,5 +48,20 @@ public class ItemDtos {
             String imageUrl,
             String source,
             Double detectedPrice
+    ) {}
+
+    /** A single retailer's offer for a product, returned by the price-comparison search. */
+    public record PriceOffer(
+            String platform,
+            String title,
+            Double price,
+            String currency,
+            String link,
+            String thumbnail
+    ) {}
+
+    public record ComparePricesResponse(
+            String query,
+            List<PriceOffer> offers
     ) {}
 }

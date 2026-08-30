@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ItemsApi } from "../api/rooms";
+import { apiErrorMessage } from "../api/client";
 
-export default function ItemCard({ item, currentUserId, onBuy, onUnbuy, onDelete }) {
+export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, onDelete }) {
   const [busy, setBusy] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
   const isBought = item.status === "BOUGHT";
   const canDelete = item.addedByUserId === currentUserId;
 
@@ -97,6 +100,104 @@ export default function ItemCard({ item, currentUserId, onBuy, onUnbuy, onDelete
             </button>
           )}
         </div>
+
+        <button
+          onClick={() => setShowCompare(true)}
+          className="text-xs text-[var(--color-lantern)] hover:underline text-left mt-1 cursor-pointer"
+        >
+          Compare prices across platforms →
+        </button>
+      </div>
+
+      {showCompare && (
+        <ComparePricesModal
+          roomId={roomId}
+          itemId={item.id}
+          itemTitle={item.title || item.url}
+          onClose={() => setShowCompare(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ComparePricesModal({ roomId, itemId, itemTitle, onClose }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [offers, setOffers] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await ItemsApi.comparePrices(roomId, itemId);
+        if (!cancelled) setOffers(data.offers || []);
+      } catch (err) {
+        if (!cancelled) setError(apiErrorMessage(err, "Couldn't fetch prices right now."));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 max-w-md w-full card-elevated max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <h3 className="font-[var(--font-display)] text-lg text-[var(--color-cream)] leading-snug">
+            Compare prices
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-[var(--color-mist)] hover:text-[var(--color-cream)] text-sm cursor-pointer shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+        <p className="text-xs text-[var(--color-mist)] mb-4 line-clamp-1">{itemTitle}</p>
+
+        {loading && (
+          <p className="text-sm text-[var(--color-mist)]">Searching platforms…</p>
+        )}
+
+        {!loading && error && (
+          <p className="text-sm text-[var(--color-rose)]">{error}</p>
+        )}
+
+        {!loading && !error && offers.length === 0 && (
+          <p className="text-sm text-[var(--color-mist)]">
+            No comparable listings found for this product yet.
+          </p>
+        )}
+
+        {!loading && !error && offers.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {offers.map((offer, i) => (
+              <li key={i}>
+                <a
+                  href={offer.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between gap-3 bg-[var(--color-surface-2)] border border-[var(--color-border)] hover:border-[var(--color-lantern)] rounded-lg px-3 py-2.5 transition-colors"
+                >
+                  <span className="text-sm text-[var(--color-cream)] truncate">{offer.platform}</span>
+                  <span className="font-[var(--font-mono)] text-[var(--color-lantern)] font-semibold text-sm shrink-0">
+                    {offer.price != null ? `₹${Number(offer.price).toLocaleString("en-IN")}` : "—"}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

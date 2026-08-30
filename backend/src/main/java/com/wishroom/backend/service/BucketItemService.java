@@ -24,10 +24,18 @@ public class BucketItemService {
     private final UserRepository userRepository;
     private final RoomService roomService;
     private final LinkMetadataService linkMetadataService;
+    private final PriceComparisonService priceComparisonService;
 
     public LinkPreviewResponse previewLink(String userId, String roomId, String url) {
         roomService.requireMembership(userId, roomId);
         return linkMetadataService.fetchPreview(url);
+    }
+
+    public ComparePricesResponse comparePrices(String userId, String roomId, String itemId) {
+        roomService.requireMembership(userId, roomId);
+        BucketItem item = getItemInRoom(roomId, itemId);
+        String query = item.getTitle() != null && !item.getTitle().isBlank() ? item.getTitle() : item.getUrl();
+        return priceComparisonService.comparePrices(query);
     }
 
     public ItemResponse addItem(String userId, String roomId, AddItemRequest request) {

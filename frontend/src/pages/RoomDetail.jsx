@@ -156,7 +156,7 @@ export default function RoomDetail() {
                 onClick={() => setFilter(f)}
                 className={`text-xs px-3 py-1.5 rounded-full border transition-colors cursor-pointer ${
                   filter === f
-                    ? "bg-[var(--color-lantern)] text-[var(--color-ink)] border-[var(--color-lantern)] font-semibold"
+                    ? "bg-[var(--color-lantern)] text-[var(--color-on-accent)] border-[var(--color-lantern)] font-semibold"
                     : "border-[var(--color-border)] text-[var(--color-mist)] hover:text-[var(--color-cream)]"
                 }`}
               >
@@ -187,6 +187,7 @@ export default function RoomDetail() {
               <ItemCard
                 key={item.id}
                 item={item}
+                roomId={roomId}
                 currentUserId={user?.id}
                 onBuy={handleBuy}
                 onUnbuy={handleUnbuy}
