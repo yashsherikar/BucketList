@@ -45,7 +45,9 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/api/health").permitAll()
                         .anyRequest().authenticated()
+
                 )
                 .headers(headers -> headers.frameOptions(frame -> frame.disable())) // needed for h2-console
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
