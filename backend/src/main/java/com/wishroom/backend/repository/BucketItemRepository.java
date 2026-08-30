@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface BucketItemRepository extends JpaRepository<BucketItem, String> {
     List<BucketItem> findByRoomIdOrderByCreatedAtDesc(String roomId);
+    List<BucketItem> findByImageUrlIsNull();
 }
