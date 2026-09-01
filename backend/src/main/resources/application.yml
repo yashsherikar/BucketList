@@ -1,3 +1,6 @@
+server:
+  port: ${PORT:8080}
+
 spring:
   application:
     name: wishroom-backend
@@ -45,6 +48,10 @@ spring:
   config:
     activate:
       on-profile: prod
+  main:
+    lazy-initialization: true
+  jmx:
+    enabled: false
   datasource:
     url: ${DATABASE_URL}
     username: ${DATABASE_USERNAME}
