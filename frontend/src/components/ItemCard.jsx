@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
+import { Modal } from "../pages/Rooms";
 import { ItemsApi } from "../api/rooms";
 import { apiErrorMessage } from "../api/client";
 
-export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, onDelete }) {
+export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, onDelete, onUpdate }) {
   const [busy, setBusy] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const isBought = item.status === "BOUGHT";
-  const canDelete = item.addedByUserId === currentUserId;
+  const isMine = item.addedByUserId === currentUserId;
 
   const run = async (fn) => {
     setBusy(true);
@@ -87,7 +89,18 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
             </button>
           )}
 
-          {canDelete && (
+          {isMine && (
+            <button
+              disabled={busy}
+              onClick={() => setShowEdit(true)}
+              className="px-3 rounded-lg border border-[var(--color-border)] text-[var(--color-mist)] hover:text-[var(--color-cream)] text-sm cursor-pointer disabled:opacity-50"
+              title="Edit item"
+            >
+              ✎
+            </button>
+          )}
+
+          {isMine && (
             <button
               disabled={busy}
               onClick={() => run(() => onDelete(item.id))}
@@ -111,7 +124,93 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
           onClose={() => setShowCompare(false)}
         />
       )}
+
+      {showEdit && (
+        <EditItemModal
+          roomId={roomId}
+          item={item}
+          onSaved={(updated) => {
+            onUpdate(updated);
+            setShowEdit(false);
+          }}
+          onClose={() => setShowEdit(false)}
+        />
+      )}
     </div>
+  );
+}
+
+function EditItemModal({ roomId, item, onSaved, onClose }) {
+  const [title, setTitle] = useState(item.title || "");
+  const [price, setPrice] = useState(item.price != null ? String(item.price) : "");
+  const [notes, setNotes] = useState(item.notes || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSaving(true);
+    try {
+      const updated = await ItemsApi.update(roomId, item.id, {
+        title: title.trim() || null,
+        price: price ? Number(price) : null,
+        notes: notes.trim() || null,
+      });
+      onSaved(updated);
+    } catch (err) {
+      setError(apiErrorMessage(err, "Couldn't save changes."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} title="Edit item">
+      <form onSubmit={onSubmit} className="space-y-4">
+        {error && <p className="text-sm text-[var(--color-rose)]">{error}</p>}
+
+        <div>
+          <label className="block text-xs font-medium text-[var(--color-mist)] mb-1.5">Title</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full bg-[var(--color-ink)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-lantern)]"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-[var(--color-mist)] mb-1.5">Price (₹)</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="2499"
+            className="w-full bg-[var(--color-ink)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-cream)] font-[var(--font-mono)] focus:outline-none focus:ring-2 focus:ring-[var(--color-lantern)]"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-[var(--color-mist)] mb-1.5">Notes</label>
+          <input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Size M, blue color"
+            className="w-full bg-[var(--color-ink)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-lantern)]"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full rounded-lg py-2.5 disabled:opacity-60 cursor-pointer btn-premium"
+        >
+          {saving ? "Saving…" : "Save changes"}
+        </button>
+      </form>
+    </Modal>
   );
 }
 

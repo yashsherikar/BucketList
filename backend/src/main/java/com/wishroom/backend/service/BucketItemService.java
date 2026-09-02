@@ -97,6 +97,11 @@ public class BucketItemService {
         roomService.requireMembership(userId, roomId);
         BucketItem item = getItemInRoom(roomId, itemId);
 
+        // Only the person who added an item can edit it.
+        if (!item.getAddedByUserId().equals(userId)) {
+            throw new ForbiddenException("Only the person who added this item can edit it");
+        }
+
         if (request.title() != null) item.setTitle(request.title());
         if (request.imageUrl() != null) item.setImageUrl(request.imageUrl());
         if (request.notes() != null) item.setNotes(request.notes());
