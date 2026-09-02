@@ -54,6 +54,20 @@ public class BucketItemController {
         return ResponseEntity.ok(bucketItemService.updateItem(userId(auth), roomId, itemId, request));
     }
 
+    @PostMapping("/{itemId}/reserve")
+    public ResponseEntity<ItemResponse> reserveItem(
+            Authentication auth, @PathVariable String roomId, @PathVariable String itemId
+    ) {
+        return ResponseEntity.ok(bucketItemService.reserveItem(userId(auth), roomId, itemId));
+    }
+
+    @PostMapping("/{itemId}/release")
+    public ResponseEntity<ItemResponse> releaseItem(
+            Authentication auth, @PathVariable String roomId, @PathVariable String itemId
+    ) {
+        return ResponseEntity.ok(bucketItemService.releaseItem(userId(auth), roomId, itemId));
+    }
+
     @PostMapping("/{itemId}/buy")
     public ResponseEntity<ItemResponse> markBought(
             Authentication auth, @PathVariable String roomId, @PathVariable String itemId

@@ -48,8 +48,16 @@ public class BucketItem {
     @Builder.Default
     private ItemStatus status = ItemStatus.WISHLISTED;
 
+    /** Nullable in the DB so ddl-auto can add the column to tables that already have rows. */
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private ItemPriority priority = ItemPriority.NICE_TO_HAVE;
+
     @Column(nullable = false)
     private String addedByUserId;
+
+    /** Set while status == RESERVED — whoever called "I'll get this". */
+    private String reservedByUserId;
 
     private String boughtByUserId;
 

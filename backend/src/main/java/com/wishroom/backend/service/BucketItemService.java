@@ -2,8 +2,10 @@ package com.wishroom.backend.service;
 
 import com.wishroom.backend.dto.ItemDtos.*;
 import com.wishroom.backend.entity.BucketItem;
+import com.wishroom.backend.entity.ItemPriority;
 import com.wishroom.backend.entity.ItemStatus;
 import com.wishroom.backend.entity.User;
+import com.wishroom.backend.exception.ApiExceptions.BadRequestException;
 import com.wishroom.backend.exception.ApiExceptions.ForbiddenException;
 import com.wishroom.backend.exception.ApiExceptions.NotFoundException;
 import com.wishroom.backend.repository.BucketItemRepository;
@@ -81,6 +83,7 @@ public class BucketItemService {
                 .price(request.price() != null ? request.price() : preview.detectedPrice())
                 .addedByUserId(userId)
                 .status(ItemStatus.WISHLISTED)
+                .priority(parsePriority(request.priority()))
                 .build();
 
         item = bucketItemRepository.save(item);
@@ -107,6 +110,42 @@ public class BucketItemService {
         if (request.notes() != null) item.setNotes(request.notes());
         if (request.price() != null) item.setPrice(request.price());
         if (request.currency() != null) item.setCurrency(request.currency());
+        if (request.priority() != null) item.setPriority(parsePriority(request.priority()));
+        item.setUpdatedAt(Instant.now());
+
+        item = bucketItemRepository.save(item);
+        return toResponse(item);
+    }
+
+    public ItemResponse reserveItem(String userId, String roomId, String itemId) {
+        roomService.requireMembership(userId, roomId);
+        BucketItem item = getItemInRoom(roomId, itemId);
+
+        if (item.getStatus() != ItemStatus.WISHLISTED) {
+            throw new BadRequestException("This item is already reserved or bought");
+        }
+
+        item.setStatus(ItemStatus.RESERVED);
+        item.setReservedByUserId(userId);
+        item.setUpdatedAt(Instant.now());
+
+        item = bucketItemRepository.save(item);
+        return toResponse(item);
+    }
+
+    public ItemResponse releaseItem(String userId, String roomId, String itemId) {
+        roomService.requireMembership(userId, roomId);
+        BucketItem item = getItemInRoom(roomId, itemId);
+
+        if (item.getStatus() != ItemStatus.RESERVED) {
+            throw new BadRequestException("This item isn't reserved");
+        }
+        if (!userId.equals(item.getReservedByUserId())) {
+            throw new ForbiddenException("Only the person who reserved this item can release it");
+        }
+
+        item.setStatus(ItemStatus.WISHLISTED);
+        item.setReservedByUserId(null);
         item.setUpdatedAt(Instant.now());
 
         item = bucketItemRepository.save(item);
@@ -120,6 +159,7 @@ public class BucketItemService {
         item.setStatus(ItemStatus.BOUGHT);
         item.setBoughtByUserId(userId);
         item.setBoughtAt(Instant.now());
+        item.setReservedByUserId(null);
         item.setUpdatedAt(Instant.now());
 
         item = bucketItemRepository.save(item);
@@ -133,10 +173,20 @@ public class BucketItemService {
         item.setStatus(ItemStatus.WISHLISTED);
         item.setBoughtByUserId(null);
         item.setBoughtAt(null);
+        item.setReservedByUserId(null);
         item.setUpdatedAt(Instant.now());
 
         item = bucketItemRepository.save(item);
         return toResponse(item);
+    }
+
+    private ItemPriority parsePriority(String raw) {
+        if (raw == null || raw.isBlank()) return ItemPriority.NICE_TO_HAVE;
+        try {
+            return ItemPriority.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ItemPriority.NICE_TO_HAVE;
+        }
     }
 
     public void deleteItem(String userId, String roomId, String itemId) {
@@ -163,19 +213,25 @@ public class BucketItemService {
 
     private ItemResponse toResponse(BucketItem item) {
         Map<String, User> usersById = userRepository.findAllById(
-                java.util.stream.Stream.of(item.getAddedByUserId(), item.getBoughtByUserId())
+                java.util.stream.Stream.of(item.getAddedByUserId(), item.getReservedByUserId(), item.getBoughtByUserId())
                         .filter(java.util.Objects::nonNull)
                         .toList()
         ).stream().collect(Collectors.toMap(User::getId, u -> u));
 
         User addedBy = usersById.get(item.getAddedByUserId());
+        User reservedBy = item.getReservedByUserId() != null ? usersById.get(item.getReservedByUserId()) : null;
         User boughtBy = item.getBoughtByUserId() != null ? usersById.get(item.getBoughtByUserId()) : null;
+
+        String priority = (item.getPriority() != null ? item.getPriority() : ItemPriority.NICE_TO_HAVE).name();
 
         return new ItemResponse(
                 item.getId(), item.getRoomId(), item.getUrl(), item.getTitle(), item.getImageUrl(),
                 item.getNotes(), item.getSource(), item.getPrice(), item.getCurrency(),
-                item.getStatus().name(), item.getAddedByUserId(),
+                item.getStatus().name(), priority,
+                item.getAddedByUserId(),
                 addedBy != null ? addedBy.getName() : "Unknown",
+                item.getReservedByUserId(),
+                reservedBy != null ? reservedBy.getName() : null,
                 item.getBoughtByUserId(),
                 boughtBy != null ? boughtBy.getName() : null,
                 item.getBoughtAt(), item.getCreatedAt(), item.getUpdatedAt()

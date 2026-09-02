@@ -10,7 +10,8 @@ public class ItemDtos {
     public record AddItemRequest(
             @NotBlank(message = "Product link is required") String url,
             String notes,
-            Double price
+            Double price,
+            String priority
     ) {}
 
     public record UpdateItemRequest(
@@ -18,7 +19,8 @@ public class ItemDtos {
             String imageUrl,
             String notes,
             Double price,
-            String currency
+            String currency,
+            String priority
     ) {}
 
     public record ItemResponse(
@@ -32,8 +34,11 @@ public class ItemDtos {
             Double price,
             String currency,
             String status,
+            String priority,
             String addedByUserId,
             String addedByName,
+            String reservedByUserId,
+            String reservedByName,
             String boughtByUserId,
             String boughtByName,
             Instant boughtAt,

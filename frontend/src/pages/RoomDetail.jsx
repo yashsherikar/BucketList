@@ -18,6 +18,7 @@ export default function RoomDetail() {
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [filter, setFilter] = useState("ALL");
+  const [sort, setSort] = useState("recent");
   const [copied, setCopied] = useState(false);
 
   const load = async () => {
@@ -61,6 +62,16 @@ export default function RoomDetail() {
     setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
   };
 
+  const handleReserve = async (itemId) => {
+    const updated = await ItemsApi.reserve(roomId, itemId);
+    setItems((prev) => prev.map((i) => (i.id === itemId ? updated : i)));
+  };
+
+  const handleRelease = async (itemId) => {
+    const updated = await ItemsApi.release(roomId, itemId);
+    setItems((prev) => prev.map((i) => (i.id === itemId ? updated : i)));
+  };
+
   const handleLeave = async () => {
     if (!window.confirm("Leave this room?")) return;
     await RoomsApi.leave(roomId);
@@ -74,6 +85,13 @@ export default function RoomDetail() {
   };
 
   const filteredItems = items.filter((i) => filter === "ALL" || i.status === filter);
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    if (sort === "price-asc") return (a.price ?? Infinity) - (b.price ?? Infinity);
+    if (sort === "price-desc") return (b.price ?? -Infinity) - (a.price ?? -Infinity);
+    if (sort === "priority")
+      return (a.priority === "MUST_HAVE" ? 0 : 1) - (b.priority === "MUST_HAVE" ? 0 : 1);
+    return 0; // "recent" — backend already returns newest first
+  });
   const isOwner = room && user && room.ownerId === user.id;
 
   if (loading) {
@@ -153,8 +171,13 @@ export default function RoomDetail() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div className="flex gap-2">
-            {["ALL", "WISHLISTED", "BOUGHT"].map((f) => (
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              ["ALL", "All"],
+              ["WISHLISTED", "Wishlisted"],
+              ["RESERVED", "Reserved"],
+              ["BOUGHT", "Bought"],
+            ].map(([f, label]) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -164,9 +187,20 @@ export default function RoomDetail() {
                     : "border-[var(--color-border)] text-[var(--color-mist)] hover:text-[var(--color-cream)]"
                 }`}
               >
-                {f === "ALL" ? "All" : f === "WISHLISTED" ? "Wishlisted" : "Bought"}
+                {label}
               </button>
             ))}
+
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="text-xs px-3 py-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-mist)] cursor-pointer hover:text-[var(--color-cream)]"
+            >
+              <option value="recent">Recently added</option>
+              <option value="price-asc">Price: low to high</option>
+              <option value="price-desc">Price: high to low</option>
+              <option value="priority">Priority</option>
+            </select>
           </div>
 
           <button
@@ -177,7 +211,7 @@ export default function RoomDetail() {
           </button>
         </div>
 
-        {filteredItems.length === 0 ? (
+        {sortedItems.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-[var(--color-border)] rounded-2xl">
             <span className="text-4xl" aria-hidden>🎁</span>
             <p className="text-[var(--color-cream)] font-[var(--font-display)] text-xl mt-4">
@@ -187,7 +221,7 @@ export default function RoomDetail() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredItems.map((item) => (
+            {sortedItems.map((item) => (
               <ItemCard
                 key={item.id}
                 item={item}
@@ -197,6 +231,8 @@ export default function RoomDetail() {
                 onUnbuy={handleUnbuy}
                 onDelete={handleDelete}
                 onUpdate={handleUpdate}
+                onReserve={handleReserve}
+                onRelease={handleRelease}
               />
             ))}
           </div>

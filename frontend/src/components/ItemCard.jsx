@@ -3,12 +3,44 @@ import { Modal } from "../pages/Rooms";
 import { ItemsApi } from "../api/rooms";
 import { apiErrorMessage } from "../api/client";
 
-export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, onDelete, onUpdate }) {
+const PRIORITY_OPTIONS = [
+  { value: "MUST_HAVE", label: "Must have" },
+  { value: "NICE_TO_HAVE", label: "Nice to have" },
+];
+
+function formatMoney(amount, currency) {
+  if (amount == null) return null;
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: currency || "INR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${currency || "₹"} ${Number(amount).toLocaleString("en-IN")}`;
+  }
+}
+
+export default function ItemCard({
+  item,
+  roomId,
+  currentUserId,
+  onBuy,
+  onUnbuy,
+  onDelete,
+  onUpdate,
+  onReserve,
+  onRelease,
+}) {
   const [busy, setBusy] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+
   const isBought = item.status === "BOUGHT";
+  const isReserved = item.status === "RESERVED";
+  const reservedByMe = isReserved && item.reservedByUserId === currentUserId;
   const isMine = item.addedByUserId === currentUserId;
+  const mustHave = item.priority === "MUST_HAVE";
 
   const run = async (fn) => {
     setBusy(true);
@@ -22,7 +54,11 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
   return (
     <div
       className={`bg-[var(--color-surface)] border rounded-2xl overflow-hidden flex flex-col transition-colors card-elevated ${
-        isBought ? "border-[var(--color-sage)]/40" : "border-[var(--color-border)]"
+        isBought
+          ? "border-[var(--color-sage)]/40"
+          : isReserved
+          ? "border-[var(--color-lantern)]/40"
+          : "border-[var(--color-border)]"
       }`}
     >
       <div className="aspect-[4/3] bg-[var(--color-surface-2)] relative">
@@ -36,6 +72,11 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
             Bought
           </span>
         )}
+        {isReserved && (
+          <span className="absolute top-2 right-2 bg-[var(--color-lantern)] text-[var(--color-on-accent)] text-xs font-semibold px-2 py-1 rounded-full">
+            Reserved
+          </span>
+        )}
         {item.source && (
           <span className="absolute bottom-2 left-2 bg-black/60 text-[var(--color-cream)] text-[10px] px-2 py-0.5 rounded-full font-[var(--font-mono)]">
             {item.source}
@@ -44,15 +85,22 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
       </div>
 
       <div className="p-4 flex flex-col gap-2 flex-1">
-        <h3 className="font-medium text-[var(--color-cream)] line-clamp-2 leading-snug">
-          {item.title || item.url}
-        </h3>
+        <div className="flex items-start gap-2">
+          <h3 className="font-medium text-[var(--color-cream)] line-clamp-2 leading-snug flex-1">
+            {item.title || item.url}
+          </h3>
+          {mustHave && (
+            <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--color-marigold)]/15 text-[var(--color-marigold)] border border-[var(--color-marigold)]/30">
+              Must have
+            </span>
+          )}
+        </div>
 
         {item.notes && <p className="text-xs text-[var(--color-mist)] line-clamp-2">{item.notes}</p>}
 
         <div className="flex items-baseline justify-between mt-auto pt-2">
           <span className="font-[var(--font-mono)] text-[var(--color-lantern)] font-semibold">
-            {item.price != null ? `₹${Number(item.price).toLocaleString("en-IN")}` : "Price not set"}
+            {formatMoney(item.price, item.currency) || "Price not set"}
           </span>
           <span className="text-[10px] text-[var(--color-mist)]">added by {item.addedByName}</span>
         </div>
@@ -60,11 +108,16 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
         {isBought && item.boughtByName && (
           <p className="text-[10px] text-[var(--color-sage)]">Bought by {item.boughtByName}</p>
         )}
+        {isReserved && (
+          <p className="text-[10px] text-[var(--color-lantern)]">
+            {reservedByMe ? "You reserved this" : `Reserved by ${item.reservedByName}`}
+          </p>
+        )}
 
-        <div className="flex gap-2 mt-2">
+        <div className="flex flex-wrap gap-2 mt-2">
           <button
             onClick={() => setShowCompare(true)}
-            className="flex-1 text-center text-sm rounded-lg py-2 btn-premium cursor-pointer"
+            className="flex-1 min-w-[5rem] text-center text-sm rounded-lg py-2 btn-premium cursor-pointer"
           >
             Buy →
           </button>
@@ -78,15 +131,51 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
             >
               ↺
             </button>
-          ) : (
-            <button
-              disabled={busy}
-              onClick={() => run(() => onBuy(item.id))}
-              className="px-3 rounded-lg border border-[var(--color-sage)]/50 text-[var(--color-sage)] hover:bg-[var(--color-sage)]/10 text-sm cursor-pointer disabled:opacity-50"
-              title="Mark as bought"
+          ) : reservedByMe ? (
+            <>
+              <button
+                disabled={busy}
+                onClick={() => run(() => onRelease(item.id))}
+                className="px-3 rounded-lg border border-[var(--color-border)] text-[var(--color-mist)] hover:text-[var(--color-cream)] text-sm cursor-pointer disabled:opacity-50"
+                title="Cancel your reservation"
+              >
+                Release
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => run(() => onBuy(item.id))}
+                className="px-3 rounded-lg border border-[var(--color-sage)]/50 text-[var(--color-sage)] hover:bg-[var(--color-sage)]/10 text-sm cursor-pointer disabled:opacity-50"
+                title="Mark as bought"
+              >
+                ✓
+              </button>
+            </>
+          ) : isReserved ? (
+            <span
+              className="px-3 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-mist)] text-sm opacity-70"
+              title={`Reserved by ${item.reservedByName}`}
             >
-              ✓
-            </button>
+              Reserved
+            </span>
+          ) : (
+            <>
+              <button
+                disabled={busy}
+                onClick={() => run(() => onReserve(item.id))}
+                className="px-3 rounded-lg border border-[var(--color-lantern)]/50 text-[var(--color-lantern)] hover:bg-[var(--color-lantern)]/10 text-sm cursor-pointer disabled:opacity-50"
+                title="I'll get this — reserve it so nobody else buys it"
+              >
+                Reserve
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => run(() => onBuy(item.id))}
+                className="px-3 rounded-lg border border-[var(--color-sage)]/50 text-[var(--color-sage)] hover:bg-[var(--color-sage)]/10 text-sm cursor-pointer disabled:opacity-50"
+                title="Mark as bought"
+              >
+                ✓
+              </button>
+            </>
           )}
 
           {isMine && (
@@ -121,6 +210,7 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
           savedUrl={item.url}
           savedSource={item.source}
           savedPrice={item.price}
+          savedCurrency={item.currency}
           onClose={() => setShowCompare(false)}
         />
       )}
@@ -142,8 +232,10 @@ export default function ItemCard({ item, roomId, currentUserId, onBuy, onUnbuy, 
 
 function EditItemModal({ roomId, item, onSaved, onClose }) {
   const [title, setTitle] = useState(item.title || "");
+  const [imageUrl, setImageUrl] = useState(item.imageUrl || "");
   const [price, setPrice] = useState(item.price != null ? String(item.price) : "");
   const [notes, setNotes] = useState(item.notes || "");
+  const [priority, setPriority] = useState(item.priority || "NICE_TO_HAVE");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -154,8 +246,10 @@ function EditItemModal({ roomId, item, onSaved, onClose }) {
     try {
       const updated = await ItemsApi.update(roomId, item.id, {
         title: title.trim() || null,
+        imageUrl: imageUrl.trim() || null,
         price: price ? Number(price) : null,
         notes: notes.trim() || null,
+        priority,
       });
       onSaved(updated);
     } catch (err) {
@@ -180,6 +274,18 @@ function EditItemModal({ roomId, item, onSaved, onClose }) {
         </div>
 
         <div>
+          <label className="block text-xs font-medium text-[var(--color-mist)] mb-1.5">
+            Image URL — paste one if the preview image is missing or wrong
+          </label>
+          <input
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://…/photo.jpg"
+            className="w-full bg-[var(--color-ink)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-lantern)]"
+          />
+        </div>
+
+        <div>
           <label className="block text-xs font-medium text-[var(--color-mist)] mb-1.5">Price (₹)</label>
           <input
             type="number"
@@ -190,6 +296,21 @@ function EditItemModal({ roomId, item, onSaved, onClose }) {
             placeholder="2499"
             className="w-full bg-[var(--color-ink)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-cream)] font-[var(--font-mono)] focus:outline-none focus:ring-2 focus:ring-[var(--color-lantern)]"
           />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-[var(--color-mist)] mb-1.5">Priority</label>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className="w-full bg-[var(--color-ink)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-lantern)]"
+          >
+            {PRIORITY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -214,7 +335,7 @@ function EditItemModal({ roomId, item, onSaved, onClose }) {
   );
 }
 
-function ComparePricesModal({ roomId, itemId, itemTitle, savedUrl, savedSource, savedPrice, onClose }) {
+function ComparePricesModal({ roomId, itemId, itemTitle, savedUrl, savedSource, savedPrice, savedCurrency, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [offers, setOffers] = useState([]);
@@ -269,7 +390,7 @@ function ComparePricesModal({ roomId, itemId, itemTitle, savedUrl, savedSource, 
             {savedSource || "Saved link"} <span className="text-[10px] text-[var(--color-lantern)]">(your link)</span>
           </span>
           <span className="font-[var(--font-mono)] text-[var(--color-lantern)] font-semibold text-sm shrink-0">
-            {savedPrice != null ? `₹${Number(savedPrice).toLocaleString("en-IN")}` : "—"}
+            {formatMoney(savedPrice, savedCurrency) || "—"}
           </span>
         </a>
 
@@ -303,7 +424,7 @@ function ComparePricesModal({ roomId, itemId, itemTitle, savedUrl, savedSource, 
                 >
                   <span className="text-sm text-[var(--color-cream)] truncate">{offer.platform}</span>
                   <span className="font-[var(--font-mono)] text-[var(--color-lantern)] font-semibold text-sm shrink-0">
-                    {offer.price != null ? `₹${Number(offer.price).toLocaleString("en-IN")}` : "—"}
+                    {formatMoney(offer.price, offer.currency) || "—"}
                   </span>
                 </a>
               </li>

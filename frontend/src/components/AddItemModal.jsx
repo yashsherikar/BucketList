@@ -8,6 +8,7 @@ export default function AddItemModal({ roomId, onClose, onAdded }) {
   const [preview, setPreview] = useState(null);
   const [notes, setNotes] = useState("");
   const [price, setPrice] = useState("");
+  const [priority, setPriority] = useState("NICE_TO_HAVE");
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -37,6 +38,7 @@ export default function AddItemModal({ roomId, onClose, onAdded }) {
         url: url.trim(),
         notes: notes.trim() || null,
         price: price ? Number(price) : null,
+        priority,
       });
       onAdded(item);
     } catch (err) {
@@ -99,6 +101,18 @@ export default function AddItemModal({ roomId, onClose, onAdded }) {
             placeholder="2499"
             className="w-full bg-[var(--color-ink)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-cream)] font-[var(--font-mono)] focus:outline-none focus:ring-2 focus:ring-[var(--color-lantern)]"
           />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-[var(--color-mist)] mb-1.5">Priority</label>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className="w-full bg-[var(--color-ink)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-lantern)]"
+          >
+            <option value="MUST_HAVE">Must have</option>
+            <option value="NICE_TO_HAVE">Nice to have</option>
+          </select>
         </div>
 
         <div>
