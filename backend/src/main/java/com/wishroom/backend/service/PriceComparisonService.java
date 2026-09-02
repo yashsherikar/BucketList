@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -19,18 +20,19 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Compares a product's price across multiple retailers using RapidAPI's
- * "Real-Time Product Search" API (Google Shopping data under the hood).
+ * Compares a product's price across retailers using RapidAPI's "Real-Time
+ * Product Search" API (Google Shopping data).
  *
- * Requires the RAPIDAPI_KEY environment variable to be set. If it's missing
- * or the upstream call fails for any reason, this degrades gracefully and
- * returns an empty offer list rather than breaking the item detail view.
+ * Two calls: /search to resolve the query to a product_id, then /product-offers
+ * to list each store's price for that product. Falls back to the single
+ * aggregate search hit if /product-offers is empty or unavailable. Degrades to
+ * an empty list (never throws) so the item view keeps working without a key.
  */
 @Service
 @Slf4j
 public class PriceComparisonService {
 
-    private static final String SEARCH_ENDPOINT = "https://real-time-product-search.p.rapidapi.com/search";
+    private static final String BASE = "https://real-time-product-search.p.rapidapi.com";
     private static final String RAPIDAPI_HOST = "real-time-product-search.p.rapidapi.com";
     private static final int TIMEOUT_MS = 8000;
 
@@ -53,54 +55,62 @@ public class PriceComparisonService {
         }
 
         try {
-            String apiUrl = SEARCH_ENDPOINT
-                    + "?q=" + java.net.URLEncoder.encode(productQuery, StandardCharsets.UTF_8)
-                    + "&country=in&language=en&page=1&limit=10";
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(apiUrl))
-                    .timeout(Duration.ofMillis(TIMEOUT_MS))
-                    .header("x-rapidapi-host", RAPIDAPI_HOST)
-                    .header("x-rapidapi-key", rapidApiKey)
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) {
-                log.warn("Price comparison: RapidAPI returned HTTP {} for query '{}'", response.statusCode(), productQuery);
+            JsonNode search = get(BASE + "/search?q=" + enc(productQuery)
+                    + "&country=in&language=en&page=1&limit=10");
+            if (search == null) {
                 return new ComparePricesResponse(productQuery, Collections.emptyList());
             }
 
-            JsonNode root = objectMapper.readTree(response.body());
-            // The API has shipped the product list as both `data` (array) and
-            // `data.products` (array) across versions — accept whichever is present.
-            JsonNode results = root.path("data");
-            if (!results.isArray()) {
-                results = root.path("data").path("products");
+            JsonNode products = search.path("data").path("products");
+            if (!products.isArray()) products = search.path("data"); // tolerate older array shape
+            if (!products.isArray() || products.isEmpty()) {
+                log.warn("Price comparison: no products for '{}'. Body: {}", productQuery, trunc(search.toString()));
+                return new ComparePricesResponse(productQuery, Collections.emptyList());
             }
 
-            List<PriceOffer> offers = new ArrayList<>();
-            if (results.isArray()) {
-                for (JsonNode node : results) {
-                    JsonNode offerNode = node.path("offer");
-                    String platform = textOrNull(offerNode.path("store_name"));
-                    Double price = parsePrice(offerNode.path("price"));
-                    String link = textOrNull(offerNode.path("offer_page_url"));
-                    String title = textOrNull(node.path("product_title"));
-                    String thumbnail = textOrNull(node.path("product_photos").isArray() && node.path("product_photos").size() > 0
-                            ? node.path("product_photos").get(0) : null);
+            JsonNode first = products.get(0);
+            String productId = textOrNull(first.path("product_id"));
+            String productTitle = textOrNull(first.path("product_title"));
 
-                    if (platform != null && link != null) {
-                        offers.add(new PriceOffer(platform, title, price, "INR", link, thumbnail));
+            List<PriceOffer> offers = new ArrayList<>();
+
+            // Per-store offers for the matched product.
+            if (productId != null) {
+                JsonNode po = get(BASE + "/product-offers?product_id=" + enc(productId)
+                        + "&country=in&language=en");
+                if (po != null) {
+                    JsonNode arr = po.path("data");
+                    if (arr.isObject()) arr = arr.path("offers");
+                    if (arr.isArray()) {
+                        for (JsonNode o : arr) {
+                            String store = textOrNull(o.path("store_name"));
+                            String link = firstNonNull(
+                                    textOrNull(o.path("offer_page_url")),
+                                    textOrNull(o.path("product_page_url")));
+                            Double price = parsePrice(o.path("price"));
+                            if (store != null && link != null) {
+                                offers.add(new PriceOffer(store, productTitle, price, "INR", link,
+                                        textOrNull(o.path("store_favicon"))));
+                            }
+                        }
                     }
                 }
             }
 
+            // Fallback: at least surface the aggregate Google Shopping hit.
             if (offers.isEmpty()) {
-                String body = response.body();
-                log.warn("Price comparison: 0 offers parsed for query '{}'. Raw response starts: {}",
-                        productQuery, body.substring(0, Math.min(body.length(), 500)));
+                String link = firstNonNull(
+                        textOrNull(first.path("product_page_url")),
+                        textOrNull(first.path("offer").path("offer_page_url")));
+                Double price = parsePrice(first.path("price").isMissingNode()
+                        ? first.path("offer").path("price") : first.path("price"));
+                if (link != null) {
+                    offers.add(new PriceOffer("Google Shopping", productTitle, price, "INR", link, null));
+                }
+            }
+
+            if (offers.isEmpty()) {
+                log.warn("Price comparison: 0 offers for '{}'. Search body: {}", productQuery, trunc(search.toString()));
             }
 
             offers.sort((a, b) -> {
@@ -112,9 +122,37 @@ public class PriceComparisonService {
             return new ComparePricesResponse(productQuery, offers);
 
         } catch (Exception e) {
-            log.warn("Price comparison: failed for query '{}': {}", productQuery, e.getMessage());
+            log.warn("Price comparison: failed for '{}': {}", productQuery, e.getMessage());
             return new ComparePricesResponse(productQuery, Collections.emptyList());
         }
+    }
+
+    private JsonNode get(String url) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMillis(TIMEOUT_MS))
+                .header("x-rapidapi-host", RAPIDAPI_HOST)
+                .header("x-rapidapi-key", rapidApiKey)
+                .GET()
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            log.warn("Price comparison: {} returned HTTP {}", url.replaceFirst("\\?.*", ""), response.statusCode());
+            return null;
+        }
+        return objectMapper.readTree(response.body());
+    }
+
+    private static String enc(String s) {
+        return URLEncoder.encode(s, StandardCharsets.UTF_8);
+    }
+
+    private static String firstNonNull(String a, String b) {
+        return a != null ? a : b;
+    }
+
+    private static String trunc(String s) {
+        return s.length() > 800 ? s.substring(0, 800) : s;
     }
 
     private String textOrNull(JsonNode node) {
