@@ -167,7 +167,110 @@ h1, h2, h3,
   transform: translateY(0);
 }
 
+/* ---- Secondary / icon buttons — a consistent family alongside .btn-premium ---- */
+
+/* Outlined neutral button. Usage: <button className="btn-ghost">Release</button> */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 0.9rem;
+  background: transparent;
+  color: var(--color-mist);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+}
+.btn-ghost:hover {
+  color: var(--color-cream);
+  border-color: var(--color-lantern);
+  background: color-mix(in srgb, var(--color-lantern) 8%, transparent);
+}
+.btn-ghost:active { transform: translateY(1px); }
+
+/* Square icon button — equal footprint so action rows line up cleanly.
+   Add a colour with a modifier class: .btn-icon.is-danger / .is-accent / .is-success */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--color-border);
+  color: var(--color-mist);
+  background: transparent;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+}
+.btn-icon:hover { color: var(--color-cream); border-color: var(--color-lantern); }
+.btn-icon:active { transform: translateY(1px); }
+.btn-icon:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-icon.is-danger:hover  { color: var(--color-rose);  border-color: var(--color-rose);  background: color-mix(in srgb, var(--color-rose) 10%, transparent); }
+.btn-icon.is-accent:hover  { color: var(--color-lantern); border-color: var(--color-lantern); background: color-mix(in srgb, var(--color-lantern) 10%, transparent); }
+.btn-icon.is-success:hover { color: var(--color-sage);  border-color: var(--color-sage);  background: color-mix(in srgb, var(--color-sage) 10%, transparent); }
+
+/* ---- Focus-visible ring: keyboard users get a clear target, mouse users don't ---- */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-lantern);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- Entrance animations ---- */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-rise  { animation: rise-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade  { animation: fade-in 0.2s ease both; }
+.animate-pop   { animation: pop-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Stagger helper for grids/lists — set style={{ '--i': index }} on each child */
+.stagger { animation: rise-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+
+/* Modal backdrop + panel */
+.modal-backdrop { animation: fade-in 0.18s ease both; }
+.modal-panel { animation: pop-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ---- Skeleton shimmer for loading states ---- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface-2);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-cream) 8%, transparent), transparent);
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+
+/* ---- Nicer scrollbars ---- */
+* { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--color-lantern); background-clip: content-box; }
+
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   .card-elevated:hover, .btn-premium:hover { transform: none; }
+  .animate-rise, .animate-fade, .animate-pop, .stagger, .modal-backdrop, .modal-panel { animation: none !important; }
+  .skeleton::after { animation: none; }
 }
