@@ -34,13 +34,14 @@ public class PriceComparisonService {
 
     private static final String BASE = "https://real-time-product-search.p.rapidapi.com";
     private static final String RAPIDAPI_HOST = "real-time-product-search.p.rapidapi.com";
-    private static final int TIMEOUT_MS = 8000;
+    private static final int CONNECT_TIMEOUT_MS = 5000;
+    private static final int REQUEST_TIMEOUT_MS = 15000;
 
     @Value("${app.rapidapi.key:}")
     private String rapidApiKey;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofMillis(TIMEOUT_MS))
+            .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS))
             .build();
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -54,28 +55,35 @@ public class PriceComparisonService {
             return new ComparePricesResponse(productQuery, Collections.emptyList());
         }
 
+        JsonNode search;
         try {
-            JsonNode search = get(BASE + "/search?q=" + enc(productQuery)
+            search = get(BASE + "/search?q=" + enc(productQuery)
                     + "&country=in&language=en&page=1&limit=10");
-            if (search == null) {
-                return new ComparePricesResponse(productQuery, Collections.emptyList());
-            }
+        } catch (Exception e) {
+            log.warn("Price comparison: /search failed for '{}': {}", productQuery, e.getMessage());
+            return new ComparePricesResponse(productQuery, Collections.emptyList());
+        }
+        if (search == null) {
+            return new ComparePricesResponse(productQuery, Collections.emptyList());
+        }
 
-            JsonNode products = search.path("data").path("products");
-            if (!products.isArray()) products = search.path("data"); // tolerate older array shape
-            if (!products.isArray() || products.isEmpty()) {
-                log.warn("Price comparison: no products for '{}'. Body: {}", productQuery, trunc(search.toString()));
-                return new ComparePricesResponse(productQuery, Collections.emptyList());
-            }
+        JsonNode products = search.path("data").path("products");
+        if (!products.isArray()) products = search.path("data"); // tolerate older array shape
+        if (!products.isArray() || products.isEmpty()) {
+            log.warn("Price comparison: no products for '{}'. Body: {}", productQuery, trunc(search.toString()));
+            return new ComparePricesResponse(productQuery, Collections.emptyList());
+        }
 
-            JsonNode first = products.get(0);
-            String productId = textOrNull(first.path("product_id"));
-            String productTitle = textOrNull(first.path("product_title"));
+        JsonNode first = products.get(0);
+        String productId = textOrNull(first.path("product_id"));
+        String productTitle = textOrNull(first.path("product_title"));
 
-            List<PriceOffer> offers = new ArrayList<>();
+        List<PriceOffer> offers = new ArrayList<>();
 
-            // Per-store offers for the matched product.
-            if (productId != null) {
+        // Per-store offers for the matched product. Best-effort: if this call is
+        // slow or unavailable we still fall back to the aggregate search hit.
+        if (productId != null) {
+            try {
                 JsonNode po = get(BASE + "/product-offers?product_id=" + enc(productId)
                         + "&country=in&language=en");
                 if (po != null) {
@@ -95,42 +103,41 @@ public class PriceComparisonService {
                         }
                     }
                 }
+            } catch (Exception e) {
+                log.warn("Price comparison: /product-offers failed for '{}' (using search fallback): {}",
+                        productQuery, e.getMessage());
             }
-
-            // Fallback: at least surface the aggregate Google Shopping hit.
-            if (offers.isEmpty()) {
-                String link = firstNonNull(
-                        textOrNull(first.path("product_page_url")),
-                        textOrNull(first.path("offer").path("offer_page_url")));
-                Double price = parsePrice(first.path("price").isMissingNode()
-                        ? first.path("offer").path("price") : first.path("price"));
-                if (link != null) {
-                    offers.add(new PriceOffer("Google Shopping", productTitle, price, "INR", link, null));
-                }
-            }
-
-            if (offers.isEmpty()) {
-                log.warn("Price comparison: 0 offers for '{}'. Search body: {}", productQuery, trunc(search.toString()));
-            }
-
-            offers.sort((a, b) -> {
-                if (a.price() == null) return 1;
-                if (b.price() == null) return -1;
-                return Double.compare(a.price(), b.price());
-            });
-
-            return new ComparePricesResponse(productQuery, offers);
-
-        } catch (Exception e) {
-            log.warn("Price comparison: failed for '{}': {}", productQuery, e.getMessage());
-            return new ComparePricesResponse(productQuery, Collections.emptyList());
         }
+
+        // Fallback: at least surface the aggregate Google Shopping hit.
+        if (offers.isEmpty()) {
+            String link = firstNonNull(
+                    textOrNull(first.path("product_page_url")),
+                    textOrNull(first.path("offer").path("offer_page_url")));
+            Double price = parsePrice(first.path("price").isMissingNode()
+                    ? first.path("offer").path("price") : first.path("price"));
+            if (link != null) {
+                offers.add(new PriceOffer("Google Shopping", productTitle, price, "INR", link, null));
+            }
+        }
+
+        if (offers.isEmpty()) {
+            log.warn("Price comparison: 0 offers for '{}'. Search body: {}", productQuery, trunc(search.toString()));
+        }
+
+        offers.sort((a, b) -> {
+            if (a.price() == null) return 1;
+            if (b.price() == null) return -1;
+            return Double.compare(a.price(), b.price());
+        });
+
+        return new ComparePricesResponse(productQuery, offers);
     }
 
     private JsonNode get(String url) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .timeout(Duration.ofMillis(TIMEOUT_MS))
+                .timeout(Duration.ofMillis(REQUEST_TIMEOUT_MS))
                 .header("x-rapidapi-host", RAPIDAPI_HOST)
                 .header("x-rapidapi-key", rapidApiKey)
                 .GET()
