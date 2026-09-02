@@ -66,6 +66,6 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:https://your-frontend.vercel.app}
   jwt:
     secret: ${JWT_SECRET}
-    expiration-ms: ${JWT_EXPIRATION_MS:604800000}
+    expiration-ms: ${JWT_EXPIRATION_MS:604800000} # 7 days
   rapidapi:
     key: ${RAPIDAPI_KEY:}

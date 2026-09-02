@@ -57,6 +57,10 @@ export default function RoomDetail() {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
   };
 
+  const handleUpdate = (updated) => {
+    setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+  };
+
   const handleLeave = async () => {
     if (!window.confirm("Leave this room?")) return;
     await RoomsApi.leave(roomId);
@@ -192,6 +196,7 @@ export default function RoomDetail() {
                 onBuy={handleBuy}
                 onUnbuy={handleUnbuy}
                 onDelete={handleDelete}
+                onUpdate={handleUpdate}
               />
             ))}
           </div>
