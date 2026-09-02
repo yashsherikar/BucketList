@@ -252,11 +252,11 @@ function JoinRoomModal({ onClose, onJoined }) {
 export function Modal({ onClose, title, children }) {
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-30"
+      className="modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-30"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6"
+        className="modal-panel w-full max-w-sm bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 card-elevated"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">

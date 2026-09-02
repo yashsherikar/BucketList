@@ -1,7 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Modal } from "../pages/Rooms";
 import { ItemsApi } from "../api/rooms";
 import { apiErrorMessage } from "../api/client";
+
+const URL_RE = /(https?:\/\/[^\s"'<>]+)/i;
+
+// Pull the first real URL out of whatever was pasted ("check this out https://… nice!")
+// and drop trailing sentence punctuation.
+function extractUrl(text) {
+  const m = (text || "").match(URL_RE);
+  return m ? m[1].replace(/[.,;:)\]}>]+$/, "") : null;
+}
 
 export default function AddItemModal({ roomId, onClose, onAdded }) {
   const [url, setUrl] = useState("");
@@ -12,16 +21,25 @@ export default function AddItemModal({ roomId, onClose, onAdded }) {
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const lastFetched = useRef("");
 
-  const fetchPreview = async () => {
-    if (!url.trim()) return;
+  const cleanUrl = extractUrl(url);
+
+  const fetchPreview = async (target) => {
+    const u = target || cleanUrl;
+    if (!u) return;
+    lastFetched.current = u;
     setError("");
     setFetching(true);
     setPreview(null);
     try {
-      const data = await ItemsApi.preview(roomId, url.trim());
+      const data = await ItemsApi.preview(roomId, u);
       setPreview(data);
-      if (data.detectedPrice != null) setPrice(String(data.detectedPrice));
+      if (data.detectedPrice != null) setPrice(String(data.detectedPrice)); // auto-fill price
+      if (data.url) {
+        lastFetched.current = data.url;
+        if (data.url !== url) setUrl(data.url); // normalise the box to the clean/resolved URL
+      }
     } catch (err) {
       setError(apiErrorMessage(err, "Couldn't fetch a preview for that link — you can still add it manually."));
     } finally {
@@ -29,13 +47,25 @@ export default function AddItemModal({ roomId, onClose, onAdded }) {
     }
   };
 
+  // Auto-fetch shortly after a new URL lands in the box — no button press needed.
+  useEffect(() => {
+    if (!cleanUrl || cleanUrl === lastFetched.current) return;
+    const t = setTimeout(() => fetchPreview(cleanUrl), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleanUrl]);
+
   const onSubmit = async (e) => {
     e.preventDefault();
+    if (!cleanUrl) {
+      setError("Paste a product link (it should start with http).");
+      return;
+    }
     setError("");
     setSaving(true);
     try {
       const item = await ItemsApi.add(roomId, {
-        url: url.trim(),
+        url: cleanUrl,
         notes: notes.trim() || null,
         price: price ? Number(price) : null,
         priority,
@@ -54,7 +84,9 @@ export default function AddItemModal({ roomId, onClose, onAdded }) {
         {error && <p className="text-sm text-[var(--color-rose)]">{error}</p>}
 
         <div>
-          <label className="block text-xs font-medium text-[var(--color-mist)] mb-1.5">Product link</label>
+          <label className="block text-xs font-medium text-[var(--color-mist)] mb-1.5">
+            Product link — paste it and the details fill in automatically
+          </label>
           <div className="flex gap-2">
             <input
               required
@@ -65,17 +97,28 @@ export default function AddItemModal({ roomId, onClose, onAdded }) {
             />
             <button
               type="button"
-              onClick={fetchPreview}
-              disabled={fetching || !url.trim()}
-              className="px-3 rounded-lg border border-[var(--color-border)] text-sm text-[var(--color-cream)] hover:border-[var(--color-lantern)] disabled:opacity-50 cursor-pointer"
+              onClick={() => fetchPreview(cleanUrl)}
+              disabled={fetching || !cleanUrl}
+              className="btn-ghost h-[42px] text-sm cursor-pointer disabled:opacity-50"
+              title="Fetch the preview again"
             >
-              {fetching ? "…" : "Fetch"}
+              {fetching ? "…" : preview ? "Refresh" : "Fetch"}
             </button>
           </div>
         </div>
 
-        {preview && (
-          <div className="flex gap-3 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-xl p-3">
+        {fetching && (
+          <div className="flex gap-3 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-xl p-3 animate-fade">
+            <div className="skeleton w-16 h-16 rounded-lg shrink-0" />
+            <div className="flex-1 space-y-2 py-1">
+              <div className="skeleton h-3 w-4/5" />
+              <div className="skeleton h-3 w-2/5" />
+            </div>
+          </div>
+        )}
+
+        {!fetching && preview && (
+          <div className="flex gap-3 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-xl p-3 animate-fade">
             {preview.imageUrl ? (
               <img src={preview.imageUrl} alt="" className="w-16 h-16 object-cover rounded-lg" />
             ) : (
@@ -84,13 +127,18 @@ export default function AddItemModal({ roomId, onClose, onAdded }) {
             <div className="min-w-0">
               <p className="text-sm text-[var(--color-cream)] line-clamp-2">{preview.title || "No title found"}</p>
               {preview.source && <p className="text-xs text-[var(--color-mist)] mt-0.5">{preview.source}</p>}
+              {preview.detectedPrice != null && (
+                <p className="text-xs text-[var(--color-lantern)] mt-0.5 font-[var(--font-mono)]">
+                  detected ₹{Number(preview.detectedPrice).toLocaleString("en-IN")}
+                </p>
+              )}
             </div>
           </div>
         )}
 
         <div>
           <label className="block text-xs font-medium text-[var(--color-mist)] mb-1.5">
-            Price (₹) — confirm or enter manually
+            Price (₹) — auto-filled when detected, edit if it's off
           </label>
           <input
             type="number"
@@ -127,7 +175,7 @@ export default function AddItemModal({ roomId, onClose, onAdded }) {
 
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || fetching}
           className="w-full rounded-lg py-2.5 disabled:opacity-60 cursor-pointer btn-premium"
         >
           {saving ? "Adding…" : "Add to room"}

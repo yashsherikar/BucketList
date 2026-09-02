@@ -98,7 +98,23 @@ export default function RoomDetail() {
     return (
       <div className="min-h-screen bg-grain">
         <Navbar />
-        <p className="text-center text-[var(--color-mist)] mt-16">Loading room…</p>
+        <main className="max-w-5xl mx-auto px-5 py-10 animate-fade">
+          <div className="skeleton h-4 w-24 mb-8" />
+          <div className="skeleton h-9 w-64 mb-3" />
+          <div className="skeleton h-4 w-40 mb-10" />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-2xl overflow-hidden border border-[var(--color-border)]">
+                <div className="skeleton aspect-[4/3] rounded-none" />
+                <div className="p-4 space-y-3">
+                  <div className="skeleton h-4 w-4/5" />
+                  <div className="skeleton h-3 w-2/5" />
+                  <div className="skeleton h-9 w-full mt-2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -212,18 +228,31 @@ export default function RoomDetail() {
         </div>
 
         {sortedItems.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-[var(--color-border)] rounded-2xl">
-            <span className="text-4xl" aria-hidden>🎁</span>
+          <div className="animate-rise text-center py-20 px-6 border border-dashed border-[var(--color-border)] rounded-2xl">
+            <span className="text-5xl inline-block animate-pop" aria-hidden>🎁</span>
             <p className="text-[var(--color-cream)] font-[var(--font-display)] text-xl mt-4">
-              Nothing here yet
+              {items.length === 0 ? "Nothing here yet" : "Nothing matches this filter"}
             </p>
-            <p className="text-[var(--color-mist)] text-sm mt-2">Paste a product link to add the first item.</p>
+            <p className="text-[var(--color-mist)] text-sm mt-2">
+              {items.length === 0
+                ? "Paste a product link to add the first item."
+                : "Try a different filter or sort."}
+            </p>
+            {items.length === 0 && (
+              <button
+                onClick={() => setShowAdd(true)}
+                className="btn-premium mt-6 px-5 py-2.5 rounded-lg text-sm cursor-pointer"
+              >
+                + Add the first product
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedItems.map((item) => (
+            {sortedItems.map((item, idx) => (
               <ItemCard
                 key={item.id}
+                index={idx}
                 item={item}
                 roomId={roomId}
                 currentUserId={user?.id}
