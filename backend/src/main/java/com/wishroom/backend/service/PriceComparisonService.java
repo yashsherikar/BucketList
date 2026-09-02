@@ -73,14 +73,19 @@ public class PriceComparisonService {
             }
 
             JsonNode root = objectMapper.readTree(response.body());
+            // The API has shipped the product list as both `data` (array) and
+            // `data.products` (array) across versions — accept whichever is present.
             JsonNode results = root.path("data");
+            if (!results.isArray()) {
+                results = root.path("data").path("products");
+            }
 
             List<PriceOffer> offers = new ArrayList<>();
             if (results.isArray()) {
                 for (JsonNode node : results) {
                     JsonNode offerNode = node.path("offer");
                     String platform = textOrNull(offerNode.path("store_name"));
-                    Double price = offerNode.path("price").isMissingNode() ? null : offerNode.path("price").asDouble();
+                    Double price = parsePrice(offerNode.path("price"));
                     String link = textOrNull(offerNode.path("offer_page_url"));
                     String title = textOrNull(node.path("product_title"));
                     String thumbnail = textOrNull(node.path("product_photos").isArray() && node.path("product_photos").size() > 0
@@ -90,6 +95,12 @@ public class PriceComparisonService {
                         offers.add(new PriceOffer(platform, title, price, "INR", link, thumbnail));
                     }
                 }
+            }
+
+            if (offers.isEmpty()) {
+                String body = response.body();
+                log.warn("Price comparison: 0 offers parsed for query '{}'. Raw response starts: {}",
+                        productQuery, body.substring(0, Math.min(body.length(), 500)));
             }
 
             offers.sort((a, b) -> {
@@ -108,5 +119,18 @@ public class PriceComparisonService {
 
     private String textOrNull(JsonNode node) {
         return (node != null && !node.isMissingNode() && !node.isNull()) ? node.asText(null) : null;
+    }
+
+    /** Prices come back as numbers on some versions and strings like "₹1,499.00" / "$19.99" on others. */
+    private Double parsePrice(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) return null;
+        if (node.isNumber()) return node.asDouble();
+        String digits = node.asText("").replaceAll("[^0-9.]", "");
+        if (digits.isBlank()) return null;
+        try {
+            return Double.parseDouble(digits);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
