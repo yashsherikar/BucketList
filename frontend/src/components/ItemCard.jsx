@@ -561,7 +561,7 @@ function ComparePricesModal({ roomId, itemId, itemTitle, itemImage, savedUrl, sa
         </a>
 
         <p className="text-[10px] uppercase tracking-wide text-[var(--color-mist)] mb-2">
-          Other platforms — cheapest first
+          Verified stores — cheapest first
         </p>
 
         {loading && (
