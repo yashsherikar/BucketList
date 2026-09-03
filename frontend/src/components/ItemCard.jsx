@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Children, useEffect, useRef, useState } from "react";
 import { Modal } from "../pages/Rooms";
 import { ItemsApi } from "../api/rooms";
 import { apiErrorMessage } from "../api/client";
@@ -43,18 +43,17 @@ function StoreIcon({ url, src, label }) {
   );
 }
 
-// Swipeable strip of the matched product's photos — native scroll-snap, no library.
-function ImageSlider({ images }) {
+// Generic swipeable strip — native CSS scroll-snap, no library. Each child is one slide.
+function Slider({ children }) {
   const ref = useRef(null);
   const [idx, setIdx] = useState(0);
-  const list = (images || []).filter(Boolean);
-
-  if (list.length === 0) return <ProductThumb src={null} />;
+  const slides = Children.toArray(children);
+  if (slides.length === 0) return null;
 
   const go = (n) => {
     const el = ref.current;
     if (!el) return;
-    const next = Math.max(0, Math.min(list.length - 1, n));
+    const next = Math.max(0, Math.min(slides.length - 1, n));
     el.scrollTo({ left: next * el.clientWidth, behavior: "smooth" });
     setIdx(next);
   };
@@ -68,25 +67,20 @@ function ImageSlider({ images }) {
         }
         className="no-scrollbar flex overflow-x-auto snap-x snap-mandatory rounded-lg bg-[var(--color-ink)]"
       >
-        {list.map((src, i) => (
-          <img
-            key={i}
-            src={src}
-            alt=""
-            loading="lazy"
-            draggable={false}
-            className="w-full h-40 object-contain shrink-0 snap-center"
-          />
+        {slides.map((s, i) => (
+          <div key={i} className="w-full shrink-0 snap-center">
+            {s}
+          </div>
         ))}
       </div>
 
-      {list.length > 1 && (
+      {slides.length > 1 && (
         <>
           <button
             type="button"
             onClick={() => go(idx - 1)}
             disabled={idx === 0}
-            aria-label="Previous photo"
+            aria-label="Previous"
             className="btn-icon is-accent absolute left-1 top-1/2 -translate-y-1/2 bg-[var(--color-surface)]/85 disabled:opacity-30 cursor-pointer"
           >
             ‹
@@ -94,14 +88,14 @@ function ImageSlider({ images }) {
           <button
             type="button"
             onClick={() => go(idx + 1)}
-            disabled={idx === list.length - 1}
-            aria-label="Next photo"
+            disabled={idx === slides.length - 1}
+            aria-label="Next"
             className="btn-icon is-accent absolute right-1 top-1/2 -translate-y-1/2 bg-[var(--color-surface)]/85 disabled:opacity-30 cursor-pointer"
           >
             ›
           </button>
           <div className="absolute bottom-1.5 left-0 right-0 flex justify-center gap-1">
-            {list.map((_, i) => (
+            {slides.map((_, i) => (
               <span
                 key={i}
                 className={`w-1.5 h-1.5 rounded-full transition-colors ${
@@ -113,6 +107,41 @@ function ImageSlider({ images }) {
         </>
       )}
     </div>
+  );
+}
+
+// One slide: a store's product photo with its name + price badges, links to the store.
+function OfferSlide({ offer, fallbackImage }) {
+  const [broken, setBroken] = useState(false);
+  const img = !broken ? offer.image || fallbackImage : fallbackImage;
+  return (
+    <a
+      href={offer.link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="relative block"
+      title={`${offer.platform} — open store`}
+    >
+      {img ? (
+        <img
+          src={img}
+          alt={offer.platform}
+          loading="lazy"
+          draggable={false}
+          onError={() => setBroken(true)}
+          className="w-full h-40 object-contain"
+        />
+      ) : (
+        <div className="w-full h-40 flex items-center justify-center text-3xl">🎁</div>
+      )}
+      <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-[var(--color-surface)]/90 rounded-full pl-1 pr-2 py-0.5 text-[10px] text-[var(--color-cream)] max-w-[70%]">
+        <StoreIcon url={offer.link} src={offer.thumbnail} label={offer.platform} />
+        <span className="truncate">{offer.platform}</span>
+      </span>
+      <span className="absolute top-1.5 right-1.5 bg-[var(--color-surface)]/90 rounded-full px-2 py-0.5 text-[10px] font-[var(--font-mono)] font-semibold text-[var(--color-lantern)]">
+        {formatMoney(offer.price, offer.currency) || "—"}
+      </span>
+    </a>
   );
 }
 
@@ -519,25 +548,33 @@ function ComparePricesModal({ roomId, itemId, itemTitle, itemImage, savedUrl, sa
         </div>
         <p className="text-xs text-[var(--color-mist)] mb-4 line-clamp-1">{itemTitle}</p>
 
-        {/* Matched-as strip: your item vs. what the search locked onto, so you can
-            eyeball whether the prices below are for the right product. */}
-        {!loading && !error && matched && (
+        {/* Your item vs. a swipeable strip of every suggested store's product
+            photo — same cheapest-first order as the list below. */}
+        {!loading && !error && offers.length > 0 && (
           <div className="animate-fade mb-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2.5">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--color-mist)] mb-2">Matched product</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--color-mist)] mb-2">
+              Compare — swipe through the stores
+            </p>
             <div className="flex gap-3">
               <div className="flex flex-col items-center gap-1 shrink-0">
                 <ProductThumb src={itemImage} />
                 <span className="text-[9px] text-[var(--color-mist)]">yours</span>
               </div>
               <div className="min-w-0 flex-1">
-                <ImageSlider images={matched.images} />
-                <p className="text-[11px] text-[var(--color-cream)] leading-snug mt-1.5 line-clamp-2">
-                  {matched.title}
-                </p>
+                <Slider>
+                  {offers.map((o, i) => (
+                    <OfferSlide key={i} offer={o} fallbackImage={matched?.images?.[0]} />
+                  ))}
+                </Slider>
+                {matched?.title && (
+                  <p className="text-[11px] text-[var(--color-mist)] leading-snug mt-1.5 line-clamp-2">
+                    {matched.title}
+                  </p>
+                )}
               </div>
             </div>
             <p className="text-[10px] text-[var(--color-mist)] mt-2">
-              Swipe the photos — if it&apos;s not your product, the prices below won&apos;t apply, use your link.
+              Not your product? The prices won&apos;t apply — use your link above.
             </p>
           </div>
         )}
