@@ -40,11 +40,13 @@ public class BucketItemService {
         return priceComparisonService.comparePrices(query);
     }
 
-    /** Marketing filler that only hurts shopping-search matching. */
+    /** Marketing filler that only hurts shopping-search matching. NOTE: bundle
+     *  words (combo / pack / set / pcs) are deliberately NOT here — for a combo
+     *  product they're the whole point and dropping them matches the single item. */
     private static final java.util.Set<String> QUERY_NOISE = java.util.Set.of(
             "with", "for", "and", "the", "best", "premium", "new", "original", "genuine",
-            "combo", "pack", "set", "of", "free", "offer", "buy", "online", "india",
-            "official", "brand", "latest", "edition", "warranty", "pcs", "piece", "pieces",
+            "of", "free", "offer", "buy", "online", "india",
+            "official", "brand", "latest", "edition", "warranty",
             "men", "man", "women", "woman", "unisex"
     );
 
