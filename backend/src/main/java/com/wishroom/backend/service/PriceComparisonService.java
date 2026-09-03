@@ -123,15 +123,28 @@ public class PriceComparisonService {
 
         if (offers.isEmpty()) {
             log.warn("Price comparison: 0 offers for '{}'. Search body: {}", productQuery, trunc(search.toString()));
+            return new ComparePricesResponse(productQuery, offers);
         }
 
-        offers.sort((a, b) -> {
-            if (a.price() == null) return 1;
-            if (b.price() == null) return -1;
-            return Double.compare(a.price(), b.price());
-        });
+        // Priced offers, cheapest first; if none are priced, keep whatever we have.
+        List<PriceOffer> ranked = offers.stream()
+                .filter(o -> o.price() != null)
+                .sorted(java.util.Comparator.comparingDouble(PriceOffer::price))
+                .toList();
+        if (ranked.isEmpty()) ranked = offers;
 
-        return new ComparePricesResponse(productQuery, offers);
+        // One row per store, top 5.
+        java.util.Set<String> seenStores = new java.util.HashSet<>();
+        List<PriceOffer> top = new ArrayList<>();
+        for (PriceOffer o : ranked) {
+            String key = o.platform() == null ? "" : o.platform().trim().toLowerCase();
+            if (seenStores.add(key) && !key.isEmpty()) {
+                top.add(o);
+                if (top.size() == 5) break;
+            }
+        }
+
+        return new ComparePricesResponse(productQuery, top);
     }
 
     private JsonNode get(String url) throws Exception {

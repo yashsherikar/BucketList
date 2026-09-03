@@ -1,22 +1,14 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { AuthApi } from "../api/auth";
+import { tokenMsLeft } from "../lib/token";
 
 const AuthContext = createContext(null);
 
-// ms left until the JWT's `exp` claim; 0 if the token is missing, malformed, or already expired.
-function msUntilExpiry(token) {
-  try {
-    const { exp } = JSON.parse(atob(token.split(".")[1]));
-    return exp * 1000 - Date.now();
-  } catch {
-    return 0;
-  }
-}
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
+    // Only trust a stored user if there's still a live token to back it.
     const raw = localStorage.getItem("wishroom_user");
-    return raw ? JSON.parse(raw) : null;
+    return raw && tokenMsLeft() > 0 ? JSON.parse(raw) : null;
   });
   const timerRef = useRef(null);
 
@@ -30,9 +22,8 @@ export function AuthProvider({ children }) {
   // Auto-logout when the token expires (7 days), even if the user is idle and
   // makes no request. Re-runs on mount and after every login/logout.
   useEffect(() => {
-    const token = localStorage.getItem("wishroom_token");
-    if (!token) return;
-    const ms = msUntilExpiry(token);
+    if (!localStorage.getItem("wishroom_token")) return;
+    const ms = tokenMsLeft();
     if (ms <= 0) {
       logout();
       return;

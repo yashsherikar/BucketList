@@ -40,13 +40,20 @@ public class BucketItemService {
         return priceComparisonService.comparePrices(query);
     }
 
+    /** Marketing filler that only hurts shopping-search matching. */
+    private static final java.util.Set<String> QUERY_NOISE = java.util.Set.of(
+            "with", "for", "and", "the", "best", "premium", "new", "original", "genuine",
+            "combo", "pack", "set", "of", "free", "offer", "buy", "online", "india",
+            "official", "brand", "latest", "edition", "warranty", "pcs", "piece", "pieces",
+            "men", "man", "women", "woman", "unisex"
+    );
+
     /**
      * Product titles scraped from retailer pages are often full marketing copy
      * ("boAt Rockerz Plus 440 | Best-in-Segment Wireless Headphones with Dual
-     * Drivers & 60 Hours Playback"), which makes a poor search query — shopping
-     * search APIs match much better on just the product name. This trims at the
-     * first common separator (|, –, -, :) and caps the length, falling back to
-     * the full title if that leaves nothing usable.
+     * Drivers & 60 Hours Playback"), which makes a poor search query. Drops
+     * bracketed blurbs, cuts at the first strong separator, then keeps only the
+     * first few meaningful words. Falls back to the raw title if nothing usable.
      */
     private String buildSearchQuery(BucketItem item) {
         String title = item.getTitle();
@@ -54,10 +61,23 @@ public class BucketItemService {
             return item.getUrl();
         }
 
-        String cleaned = title.split("[|\u2013\u2014:]")[0].trim();
-        // A lone hyphen is common inside model numbers (e.g. "MX-500"), so only
-        // split on " - " (surrounded by spaces) to avoid mangling those.
-        cleaned = cleaned.split(" - ")[0].trim();
+        // 1. drop bracketed blurbs: "(100ml)", "[2024 Model]", "{Combo}"
+        String s = title.replaceAll("[\\(\\[\\{][^\\)\\]\\}]*[\\)\\]\\}]", " ");
+        // 2. cut at the first strong separator \u2014 everything after is feature spam
+        s = s.split("[|\u2013\u2014:\u00b7]")[0];
+        s = s.split(" - ")[0];
+
+        // 3. keep the first ~6 meaningful words (brand + model + a descriptor or two)
+        StringBuilder q = new StringBuilder();
+        int kept = 0;
+        for (String w : s.trim().split("\\s+")) {
+            String bare = w.replaceAll("[^\\p{L}\\p{Nd}.+-]", "");
+            if (bare.isBlank() || QUERY_NOISE.contains(bare.toLowerCase())) continue;
+            if (q.length() > 0) q.append(' ');
+            q.append(bare);
+            if (++kept >= 6) break;
+        }
+        String cleaned = q.toString().trim();
 
         if (cleaned.length() < 4) {
             cleaned = title.trim();
