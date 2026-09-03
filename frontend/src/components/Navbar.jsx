@@ -11,7 +11,13 @@ export default function Navbar() {
     <header className="border-b border-[var(--color-border)] bg-[var(--color-ink)]/95 backdrop-blur sticky top-0 z-20">
       <div className="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between">
         <Link to="/rooms" className="flex items-center gap-2 group">
-          <span className="text-2xl" aria-hidden>🏮</span>
+          <img
+            src="/logo.png"
+            alt="WishRoom"
+            width={32}
+            height={32}
+            className="w-8 h-8 rounded-lg shrink-0"
+          />
           <span
             className="font-[var(--font-display)] gradient-text text-xl tracking-tight transition-colors"
           >

@@ -36,6 +36,9 @@ public class PriceComparisonService {
     private static final String RAPIDAPI_HOST = "real-time-product-search.p.rapidapi.com";
     private static final int CONNECT_TIMEOUT_MS = 5000;
     private static final int REQUEST_TIMEOUT_MS = 15000;
+    /** Min fraction of the item's words a candidate title must share to be trusted
+     *  (relaxed further for very short queries — see comparePrices). */
+    private static final double MIN_MATCH = 0.4;
 
     @Value("${app.rapidapi.key:}")
     private String rapidApiKey;
@@ -49,10 +52,10 @@ public class PriceComparisonService {
     public ComparePricesResponse comparePrices(String productQuery) {
         if (rapidApiKey == null || rapidApiKey.isBlank()) {
             log.warn("Price comparison: RAPIDAPI_KEY not configured, skipping");
-            return new ComparePricesResponse(productQuery, Collections.emptyList());
+            return none(productQuery);
         }
         if (productQuery == null || productQuery.isBlank()) {
-            return new ComparePricesResponse(productQuery, Collections.emptyList());
+            return none(productQuery);
         }
 
         JsonNode search;
@@ -61,22 +64,50 @@ public class PriceComparisonService {
                     + "&country=in&language=en&page=1&limit=10");
         } catch (Exception e) {
             log.warn("Price comparison: /search failed for '{}': {}", productQuery, e.getMessage());
-            return new ComparePricesResponse(productQuery, Collections.emptyList());
+            return none(productQuery);
         }
         if (search == null) {
-            return new ComparePricesResponse(productQuery, Collections.emptyList());
+            return none(productQuery);
         }
 
         JsonNode products = search.path("data").path("products");
         if (!products.isArray()) products = search.path("data"); // tolerate older array shape
         if (!products.isArray() || products.isEmpty()) {
             log.warn("Price comparison: no products for '{}'. Body: {}", productQuery, trunc(search.toString()));
-            return new ComparePricesResponse(productQuery, Collections.emptyList());
+            return none(productQuery);
         }
 
-        JsonNode first = products.get(0);
-        String productId = textOrNull(first.path("product_id"));
+        // Pick the result that actually shares words with the item — not just the
+        // first hit. Generic apparel titles ("Men Cotton Casual Shirt") otherwise
+        // match unrelated products with a similar name.
+        java.util.Set<String> queryTokens = tokens(productQuery);
+        JsonNode first = null;
+        double bestScore = 0;
+        for (JsonNode p : products) {
+            double sc = overlap(queryTokens, textOrNull(p.path("product_title")));
+            if (sc > bestScore) {
+                bestScore = sc;
+                first = p;
+            }
+        }
+        if (first == null) {
+            log.warn("Price comparison: no products matched for '{}'", productQuery);
+            return none(productQuery);
+        }
+
         String productTitle = textOrNull(first.path("product_title"));
+        String productImage = firstPhoto(first);
+
+        // Short generic queries ("Nivea Cream Combo") can't realistically hit 50%
+        // overlap; scale the bar down for them. Below the bar we still show a
+        // single aggregate link + the matched-product image so the user can judge.
+        double threshold = queryTokens.size() <= 3 ? 0.34 : MIN_MATCH;
+        boolean confident = bestScore >= threshold;
+        if (!confident) {
+            log.info("Price comparison: low-confidence match for '{}' (score {}), showing aggregate only", productQuery, bestScore);
+        }
+
+        String productId = confident ? textOrNull(first.path("product_id")) : null;
 
         List<PriceOffer> offers = new ArrayList<>();
 
@@ -109,7 +140,8 @@ public class PriceComparisonService {
             }
         }
 
-        // Fallback: at least surface the aggregate Google Shopping hit.
+        // Fallback: at least surface the aggregate Google Shopping hit for the
+        // matched product (only reached when it cleared the MIN_MATCH bar above).
         if (offers.isEmpty()) {
             String link = firstNonNull(
                     textOrNull(first.path("product_page_url")),
@@ -123,7 +155,7 @@ public class PriceComparisonService {
 
         if (offers.isEmpty()) {
             log.warn("Price comparison: 0 offers for '{}'. Search body: {}", productQuery, trunc(search.toString()));
-            return new ComparePricesResponse(productQuery, offers);
+            return new ComparePricesResponse(productQuery, offers, productTitle, productImage);
         }
 
         // Priced offers, cheapest first; if none are priced, keep whatever we have.
@@ -144,7 +176,21 @@ public class PriceComparisonService {
             }
         }
 
-        return new ComparePricesResponse(productQuery, top);
+        return new ComparePricesResponse(productQuery, top, productTitle, productImage);
+    }
+
+    private static ComparePricesResponse none(String query) {
+        return new ComparePricesResponse(query, Collections.emptyList(), null, null);
+    }
+
+    private static String firstPhoto(JsonNode p) {
+        JsonNode photos = p.path("product_photos");
+        if (photos.isArray() && photos.size() > 0) {
+            String u = photos.get(0).asText(null);
+            if (u != null && !u.isBlank()) return u;
+        }
+        JsonNode one = p.path("product_photo");
+        return (one.isMissingNode() || one.isNull()) ? null : one.asText(null);
     }
 
     private JsonNode get(String url) throws Exception {
@@ -169,6 +215,23 @@ public class PriceComparisonService {
 
     private static String firstNonNull(String a, String b) {
         return a != null ? a : b;
+    }
+
+    private static java.util.Set<String> tokens(String s) {
+        java.util.Set<String> t = new java.util.HashSet<>();
+        if (s == null) return t;
+        for (String w : s.toLowerCase().replaceAll("[^\\p{L}\\p{Nd}]+", " ").trim().split("\\s+")) {
+            if (w.length() >= 2) t.add(w);
+        }
+        return t;
+    }
+
+    /** Fraction of the query's words that also appear in the candidate title (0..1). */
+    private static double overlap(java.util.Set<String> queryTokens, String candidateTitle) {
+        if (queryTokens.isEmpty()) return 0;
+        java.util.Set<String> c = tokens(candidateTitle);
+        long hit = queryTokens.stream().filter(c::contains).count();
+        return (double) hit / queryTokens.size();
     }
 
     private static String trunc(String s) {

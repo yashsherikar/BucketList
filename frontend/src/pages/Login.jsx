@@ -29,7 +29,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center px-5 bg-grain">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <span className="text-4xl" aria-hidden>🏮</span>
+          <img src="/logo-512.png" alt="WishRoom" width={80} height={80} className="w-20 h-20 mx-auto rounded-2xl" />
           <h1 className="font-[var(--font-display)] text-3xl mt-3 text-[var(--color-cream)]">
             Welcome back
           </h1>

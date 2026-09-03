@@ -43,6 +43,25 @@ function StoreIcon({ url, src, label }) {
   );
 }
 
+// Small product image with a graceful fallback tile.
+function ProductThumb({ src }) {
+  const [broken, setBroken] = useState(false);
+  if (src && !broken) {
+    return (
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        onError={() => setBroken(true)}
+        className="w-12 h-12 rounded-md object-cover bg-[var(--color-ink)]"
+      />
+    );
+  }
+  return (
+    <div className="w-12 h-12 rounded-md bg-[var(--color-ink)] flex items-center justify-center text-lg">🎁</div>
+  );
+}
+
 function formatMoney(amount, currency) {
   if (amount == null) return null;
   try {
@@ -246,6 +265,7 @@ export default function ItemCard({
           roomId={roomId}
           itemId={item.id}
           itemTitle={item.title || item.url}
+          itemImage={item.imageUrl}
           savedUrl={item.url}
           savedSource={item.source}
           savedPrice={item.price}
@@ -374,17 +394,21 @@ function EditItemModal({ roomId, item, onSaved, onClose }) {
   );
 }
 
-function ComparePricesModal({ roomId, itemId, itemTitle, savedUrl, savedSource, savedPrice, savedCurrency, onClose }) {
+function ComparePricesModal({ roomId, itemId, itemTitle, itemImage, savedUrl, savedSource, savedPrice, savedCurrency, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [offers, setOffers] = useState([]);
+  const [matched, setMatched] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const data = await ItemsApi.comparePrices(roomId, itemId);
-        if (!cancelled) setOffers(data.offers || []);
+        if (!cancelled) {
+          setOffers(data.offers || []);
+          setMatched(data.matchedTitle ? { title: data.matchedTitle, image: data.matchedImage } : null);
+        }
       } catch (err) {
         if (!cancelled) setError(apiErrorMessage(err, "Couldn't fetch prices right now."));
       } finally {
@@ -417,6 +441,30 @@ function ComparePricesModal({ roomId, itemId, itemTitle, savedUrl, savedSource, 
           </button>
         </div>
         <p className="text-xs text-[var(--color-mist)] mb-4 line-clamp-1">{itemTitle}</p>
+
+        {/* Matched-as strip: your item vs. what the search locked onto, so you can
+            eyeball whether the prices below are for the right product. */}
+        {!loading && !error && matched && (
+          <div className="animate-fade mb-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2.5">
+            <div className="flex items-center gap-2">
+              <div className="flex flex-col items-center gap-1 shrink-0">
+                <ProductThumb src={itemImage} />
+                <span className="text-[9px] text-[var(--color-mist)]">yours</span>
+              </div>
+              <span className="text-[var(--color-mist)] text-xs shrink-0">vs</span>
+              <div className="flex flex-col items-center gap-1 shrink-0">
+                <ProductThumb src={matched.image} />
+                <span className="text-[9px] text-[var(--color-mist)]">matched</span>
+              </div>
+              <p className="text-[11px] text-[var(--color-mist)] leading-snug ml-1 line-clamp-3">
+                {matched.title}
+              </p>
+            </div>
+            <p className="text-[10px] text-[var(--color-mist)] mt-2">
+              Not the same product? The prices below won&apos;t apply — use your link.
+            </p>
+          </div>
+        )}
 
         {/* The link the user actually pasted — always shown first, always works */}
         <a
