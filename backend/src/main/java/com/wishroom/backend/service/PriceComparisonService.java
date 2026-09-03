@@ -136,7 +136,7 @@ public class PriceComparisonService {
                             if (store != null && link != null
                                     && storeReputation.isAcceptable(link, parsePrice(o.path("store_rating")), parseInt(o.path("store_review_count")))) {
                                 offers.add(new PriceOffer(store, productTitle, price, "INR", link,
-                                        textOrNull(o.path("store_favicon"))));
+                                        textOrNull(o.path("store_favicon")), firstOrNull(productImages)));
                             }
                         }
                     }
@@ -163,7 +163,9 @@ public class PriceComparisonService {
                 Double price = parsePrice(off.path("price").isMissingNode() ? p.path("price") : off.path("price"));
                 if (store != null
                         && storeReputation.isAcceptable(link, parsePrice(off.path("store_rating")), parseInt(off.path("store_review_count")))) {
-                    offers.add(new PriceOffer(store, textOrNull(p.path("product_title")), price, "INR", link, null));
+                    List<String> pics = photos(p);
+                    offers.add(new PriceOffer(store, textOrNull(p.path("product_title")), price, "INR", link,
+                            null, firstOrNull(pics.isEmpty() ? productImages : pics)));
                 }
             }
         }
@@ -177,7 +179,8 @@ public class PriceComparisonService {
             Double price = parsePrice(first.path("price").isMissingNode()
                     ? first.path("offer").path("price") : first.path("price"));
             if (link != null) {
-                offers.add(new PriceOffer("Google Shopping", productTitle, price, "INR", link, null));
+                offers.add(new PriceOffer("Google Shopping", productTitle, price, "INR", link,
+                        null, firstOrNull(productImages)));
             }
         }
 
@@ -251,6 +254,10 @@ public class PriceComparisonService {
 
     private static String firstNonNull(String a, String b) {
         return a != null ? a : b;
+    }
+
+    private static String firstOrNull(List<String> list) {
+        return (list == null || list.isEmpty()) ? null : list.get(0);
     }
 
     private Integer parseInt(JsonNode n) {

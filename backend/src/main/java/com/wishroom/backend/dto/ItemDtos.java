@@ -62,7 +62,8 @@ public class ItemDtos {
             Double price,
             String currency,
             String link,
-            String thumbnail
+            String thumbnail,   // store favicon (for the little icon)
+            String image        // product photo for this offer (for the image slider)
     ) {}
 
     public record ComparePricesResponse(
