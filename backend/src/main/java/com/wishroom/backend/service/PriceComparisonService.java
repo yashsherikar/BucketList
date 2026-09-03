@@ -43,11 +43,17 @@ public class PriceComparisonService {
     @Value("${app.rapidapi.key:}")
     private String rapidApiKey;
 
+    private final StoreReputation storeReputation;
+
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS))
             .build();
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public PriceComparisonService(StoreReputation storeReputation) {
+        this.storeReputation = storeReputation;
+    }
 
     public ComparePricesResponse comparePrices(String productQuery) {
         if (rapidApiKey == null || rapidApiKey.isBlank()) {
@@ -96,7 +102,7 @@ public class PriceComparisonService {
         }
 
         String productTitle = textOrNull(first.path("product_title"));
-        String productImage = firstPhoto(first);
+        List<String> productImages = photos(first);
 
         // Short generic queries ("Nivea Cream Combo") can't realistically hit 50%
         // overlap; scale the bar down for them. Below the bar we still show a
@@ -127,7 +133,8 @@ public class PriceComparisonService {
                                     textOrNull(o.path("offer_page_url")),
                                     textOrNull(o.path("product_page_url")));
                             Double price = parsePrice(o.path("price"));
-                            if (store != null && link != null) {
+                            if (store != null && link != null
+                                    && storeReputation.isAcceptable(link, parsePrice(o.path("store_rating")), parseInt(o.path("store_review_count")))) {
                                 offers.add(new PriceOffer(store, productTitle, price, "INR", link,
                                         textOrNull(o.path("store_favicon"))));
                             }
@@ -137,6 +144,27 @@ public class PriceComparisonService {
             } catch (Exception e) {
                 log.warn("Price comparison: /product-offers failed for '{}' (using search fallback): {}",
                         productQuery, e.getMessage());
+            }
+        }
+
+        // Widen coverage: fold in the primary offer from EVERY search result that
+        // clears the match bar, so the top-5 can span more retailers than the one
+        // product we drilled into. Only when we're confident about the product.
+        if (confident) {
+            for (JsonNode p : products) {
+                if (overlap(queryTokens, textOrNull(p.path("product_title"))) < threshold) continue;
+                JsonNode off = p.path("offer");
+                String link = firstNonNull(
+                        textOrNull(off.path("offer_page_url")),
+                        textOrNull(p.path("product_page_url")));
+                if (link == null) continue;
+                String store = textOrNull(off.path("store_name"));
+                if (store == null) store = storeFromUrl(link);
+                Double price = parsePrice(off.path("price").isMissingNode() ? p.path("price") : off.path("price"));
+                if (store != null
+                        && storeReputation.isAcceptable(link, parsePrice(off.path("store_rating")), parseInt(off.path("store_review_count")))) {
+                    offers.add(new PriceOffer(store, textOrNull(p.path("product_title")), price, "INR", link, null));
+                }
             }
         }
 
@@ -155,7 +183,7 @@ public class PriceComparisonService {
 
         if (offers.isEmpty()) {
             log.warn("Price comparison: 0 offers for '{}'. Search body: {}", productQuery, trunc(search.toString()));
-            return new ComparePricesResponse(productQuery, offers, productTitle, productImage);
+            return new ComparePricesResponse(productQuery, offers, productTitle, productImages);
         }
 
         // Priced offers, cheapest first; if none are priced, keep whatever we have.
@@ -176,21 +204,29 @@ public class PriceComparisonService {
             }
         }
 
-        return new ComparePricesResponse(productQuery, top, productTitle, productImage);
+        return new ComparePricesResponse(productQuery, top, productTitle, productImages);
     }
 
     private static ComparePricesResponse none(String query) {
-        return new ComparePricesResponse(query, Collections.emptyList(), null, null);
+        return new ComparePricesResponse(query, Collections.emptyList(), null, Collections.emptyList());
     }
 
-    private static String firstPhoto(JsonNode p) {
-        JsonNode photos = p.path("product_photos");
-        if (photos.isArray() && photos.size() > 0) {
-            String u = photos.get(0).asText(null);
-            if (u != null && !u.isBlank()) return u;
+    /** Up to 8 usable product photos from a search result. */
+    private List<String> photos(JsonNode p) {
+        List<String> out = new ArrayList<>();
+        JsonNode arr = p.path("product_photos");
+        if (arr.isArray()) {
+            for (JsonNode n : arr) {
+                String u = n.asText(null);
+                if (u != null && !u.isBlank() && !out.contains(u)) out.add(u);
+                if (out.size() == 8) break;
+            }
         }
-        JsonNode one = p.path("product_photo");
-        return (one.isMissingNode() || one.isNull()) ? null : one.asText(null);
+        if (out.isEmpty()) {
+            String one = textOrNull(p.path("product_photo"));
+            if (one != null) out.add(one);
+        }
+        return out;
     }
 
     private JsonNode get(String url) throws Exception {
@@ -215,6 +251,27 @@ public class PriceComparisonService {
 
     private static String firstNonNull(String a, String b) {
         return a != null ? a : b;
+    }
+
+    private Integer parseInt(JsonNode n) {
+        if (n == null || n.isMissingNode() || n.isNull()) return null;
+        if (n.isNumber()) return n.asInt();
+        String d = n.asText("").replaceAll("[^0-9]", "");
+        return d.isBlank() ? null : Integer.valueOf(d);
+    }
+
+    /** "https://www.amazon.in/dp/x" -> "Amazon"; google links -> "Google Shopping". */
+    private static String storeFromUrl(String url) {
+        try {
+            String h = URI.create(url).getHost();
+            if (h == null) return null;
+            h = h.replaceFirst("^www\\.", "");
+            if (h.contains("google.")) return "Google Shopping";
+            String core = h.split("\\.")[0];
+            return core.isEmpty() ? h : Character.toUpperCase(core.charAt(0)) + core.substring(1);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static java.util.Set<String> tokens(String s) {
