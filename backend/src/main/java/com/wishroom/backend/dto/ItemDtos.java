@@ -68,7 +68,7 @@ public class ItemDtos {
     public record ComparePricesResponse(
             String query,
             List<PriceOffer> offers,
-            String matchedTitle,   // the product the search actually locked onto — null if none
-            String matchedImage    // its photo, so the user can eyeball whether the match is right
+            String matchedTitle,          // the product the search actually locked onto — null if none
+            List<String> matchedImages    // its photos, so the user can swipe through and eyeball the match
     ) {}
 }

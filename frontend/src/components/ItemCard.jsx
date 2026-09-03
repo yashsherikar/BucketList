@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Modal } from "../pages/Rooms";
 import { ItemsApi } from "../api/rooms";
 import { apiErrorMessage } from "../api/client";
@@ -40,6 +40,79 @@ function StoreIcon({ url, src, label }) {
     <span className="w-5 h-5 rounded-[4px] shrink-0 bg-[var(--color-border)] text-[var(--color-cream)] text-[10px] font-semibold flex items-center justify-center">
       {(label || host || "?").charAt(0).toUpperCase()}
     </span>
+  );
+}
+
+// Swipeable strip of the matched product's photos — native scroll-snap, no library.
+function ImageSlider({ images }) {
+  const ref = useRef(null);
+  const [idx, setIdx] = useState(0);
+  const list = (images || []).filter(Boolean);
+
+  if (list.length === 0) return <ProductThumb src={null} />;
+
+  const go = (n) => {
+    const el = ref.current;
+    if (!el) return;
+    const next = Math.max(0, Math.min(list.length - 1, n));
+    el.scrollTo({ left: next * el.clientWidth, behavior: "smooth" });
+    setIdx(next);
+  };
+
+  return (
+    <div className="relative w-full select-none">
+      <div
+        ref={ref}
+        onScroll={(e) =>
+          setIdx(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth)))
+        }
+        className="no-scrollbar flex overflow-x-auto snap-x snap-mandatory rounded-lg bg-[var(--color-ink)]"
+      >
+        {list.map((src, i) => (
+          <img
+            key={i}
+            src={src}
+            alt=""
+            loading="lazy"
+            draggable={false}
+            className="w-full h-40 object-contain shrink-0 snap-center"
+          />
+        ))}
+      </div>
+
+      {list.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={() => go(idx - 1)}
+            disabled={idx === 0}
+            aria-label="Previous photo"
+            className="btn-icon is-accent absolute left-1 top-1/2 -translate-y-1/2 bg-[var(--color-surface)]/85 disabled:opacity-30 cursor-pointer"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={() => go(idx + 1)}
+            disabled={idx === list.length - 1}
+            aria-label="Next photo"
+            className="btn-icon is-accent absolute right-1 top-1/2 -translate-y-1/2 bg-[var(--color-surface)]/85 disabled:opacity-30 cursor-pointer"
+          >
+            ›
+          </button>
+          <div className="absolute bottom-1.5 left-0 right-0 flex justify-center gap-1">
+            {list.map((_, i) => (
+              <span
+                key={i}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                  i === idx ? "bg-[var(--color-lantern)]" : "bg-[var(--color-mist)]/40"
+                }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -407,7 +480,11 @@ function ComparePricesModal({ roomId, itemId, itemTitle, itemImage, savedUrl, sa
         const data = await ItemsApi.comparePrices(roomId, itemId);
         if (!cancelled) {
           setOffers(data.offers || []);
-          setMatched(data.matchedTitle ? { title: data.matchedTitle, image: data.matchedImage } : null);
+          setMatched(
+            data.matchedTitle
+              ? { title: data.matchedTitle, images: data.matchedImages || [] }
+              : null
+          );
         }
       } catch (err) {
         if (!cancelled) setError(apiErrorMessage(err, "Couldn't fetch prices right now."));
@@ -446,22 +523,21 @@ function ComparePricesModal({ roomId, itemId, itemTitle, itemImage, savedUrl, sa
             eyeball whether the prices below are for the right product. */}
         {!loading && !error && matched && (
           <div className="animate-fade mb-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2.5">
-            <div className="flex items-center gap-2">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--color-mist)] mb-2">Matched product</p>
+            <div className="flex gap-3">
               <div className="flex flex-col items-center gap-1 shrink-0">
                 <ProductThumb src={itemImage} />
                 <span className="text-[9px] text-[var(--color-mist)]">yours</span>
               </div>
-              <span className="text-[var(--color-mist)] text-xs shrink-0">vs</span>
-              <div className="flex flex-col items-center gap-1 shrink-0">
-                <ProductThumb src={matched.image} />
-                <span className="text-[9px] text-[var(--color-mist)]">matched</span>
+              <div className="min-w-0 flex-1">
+                <ImageSlider images={matched.images} />
+                <p className="text-[11px] text-[var(--color-cream)] leading-snug mt-1.5 line-clamp-2">
+                  {matched.title}
+                </p>
               </div>
-              <p className="text-[11px] text-[var(--color-mist)] leading-snug ml-1 line-clamp-3">
-                {matched.title}
-              </p>
             </div>
             <p className="text-[10px] text-[var(--color-mist)] mt-2">
-              Not the same product? The prices below won&apos;t apply — use your link.
+              Swipe the photos — if it&apos;s not your product, the prices below won&apos;t apply, use your link.
             </p>
           </div>
         )}

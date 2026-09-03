@@ -96,7 +96,7 @@ public class PriceComparisonService {
         }
 
         String productTitle = textOrNull(first.path("product_title"));
-        String productImage = firstPhoto(first);
+        List<String> productImages = photos(first);
 
         // Short generic queries ("Nivea Cream Combo") can't realistically hit 50%
         // overlap; scale the bar down for them. Below the bar we still show a
@@ -155,7 +155,7 @@ public class PriceComparisonService {
 
         if (offers.isEmpty()) {
             log.warn("Price comparison: 0 offers for '{}'. Search body: {}", productQuery, trunc(search.toString()));
-            return new ComparePricesResponse(productQuery, offers, productTitle, productImage);
+            return new ComparePricesResponse(productQuery, offers, productTitle, productImages);
         }
 
         // Priced offers, cheapest first; if none are priced, keep whatever we have.
@@ -176,21 +176,29 @@ public class PriceComparisonService {
             }
         }
 
-        return new ComparePricesResponse(productQuery, top, productTitle, productImage);
+        return new ComparePricesResponse(productQuery, top, productTitle, productImages);
     }
 
     private static ComparePricesResponse none(String query) {
-        return new ComparePricesResponse(query, Collections.emptyList(), null, null);
+        return new ComparePricesResponse(query, Collections.emptyList(), null, Collections.emptyList());
     }
 
-    private static String firstPhoto(JsonNode p) {
-        JsonNode photos = p.path("product_photos");
-        if (photos.isArray() && photos.size() > 0) {
-            String u = photos.get(0).asText(null);
-            if (u != null && !u.isBlank()) return u;
+    /** Up to 8 usable product photos from a search result. */
+    private List<String> photos(JsonNode p) {
+        List<String> out = new ArrayList<>();
+        JsonNode arr = p.path("product_photos");
+        if (arr.isArray()) {
+            for (JsonNode n : arr) {
+                String u = n.asText(null);
+                if (u != null && !u.isBlank() && !out.contains(u)) out.add(u);
+                if (out.size() == 8) break;
+            }
         }
-        JsonNode one = p.path("product_photo");
-        return (one.isMissingNode() || one.isNull()) ? null : one.asText(null);
+        if (out.isEmpty()) {
+            String one = textOrNull(p.path("product_photo"));
+            if (one != null) out.add(one);
+        }
+        return out;
     }
 
     private JsonNode get(String url) throws Exception {
